@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>首页布局DEMO</title>
+  <link rel="stylesheet" href="scripts/element-ui/theme-cool/index.css">
+  <link rel="stylesheet" href="css/index.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/color-dark.css">
+  <script src="scripts/vue.js"></script>
+  <script src="scripts/element-ui/index.js"></script>
+  <script src="scripts/axios/dist/axios.js"></script>
+  <script src="common.js"></script>
+  <style>
+    .login-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .ms-title {
+      position: absolute;
+      top: 50%;
+      width: 100%;
+      margin-top: -230px;
+      text-align: center;
+      font-size: 30px;
+      color: #fff;
+
+    }
+
+    .ms-login {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 300px;
+      height: 160px;
+      margin: -150px 0 0 -190px;
+      padding: 40px;
+      border-radius: 5px;
+      background: #fff;
+    }
+
+    .login-btn {
+      text-align: center;
+    }
+
+    .login-btn button {
+      width: 100%;
+      height: 36px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root" class="login-wrap">
+    <div class="ms-title">后台管理系统</div>
+    <div class="ms-login">
+      <el-form :model="ruleForm" :rules="rules" ref="ruleForm" label-width="0px" class="demo-ruleForm">
+        <el-form-item prop="username">
+          <el-input v-model="ruleForm.username" placeholder="username"></el-input>
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input type="password" placeholder="password" v-model="ruleForm.password" @keyup.enter.native="submitForm"></el-input>
+        </el-form-item>
+        <div class="login-btn">
+          <el-button type="primary" @click="submitForm">登录</el-button>
+        </div>
+        <!-- <p style="font-size:12px;line-height:30px;color:#999;">Tips : 用户名:admin,密码:123456</p> -->
+      </el-form>
+    </div>
+  </div>
+</body>
+<script>
+  var root = new Vue({
+    el: '#root',
+    data: {
+      urlLogin: config + '/login',
+      ruleForm: {
+        username: '',
+        password: '',
+      },
+      rules: {
+        username: [{
+          required: true,
+          message: '请输入用户名',
+          trigger: 'blur'
+        }],
+        password: [{
+          required: true,
+          message: '请输入密码',
+          trigger: 'blur'
+        }]
+      }
+    },
+    mounted() {
+      this.$el.style.visibility = 'visible'
+    },
+    methods: {
+      submitForm() {
+        const self = this;
+        axios.post(this.urlLogin, self.ruleForm).then(resp => {
+          if (resp.data.code == 0) {
+            localStorage.setItem('username', self.ruleForm.username)
+            localStorage.setItem('token', resp.data.token);
+            localStorage.setItem('name', resp.data.name);
+            this.setCookie("JSESSIONID", resp.data.token)
+            setTimeout(() => {
+              window.location.replace('index.html')
+            }, 100);
+          } else {
+            this.$message.error(resp.data.msg);
+            return false;
+          }
+        })
+      },
+      setCookie(cname, cvalue, exdays) {
+        var d = new Date();
+        d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+        var expires = "expires=" + d.toUTCString();
+        document.cookie = cname + "=" + cvalue + "; " + expires;
+      },
+    }
+  })
+</script>
+
+
+<style>
+  * {
+    font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  }
+
+  tr {
+    height: 40px;
+  }
+
+  .hdrTable {
+    height: 40vh;
+  }
+
+  .detTable {
+    height: 25vh;
+  }
+
+  .el-header {
+    padding: 0px
+  }
+</style>

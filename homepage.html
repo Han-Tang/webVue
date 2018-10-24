@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>新-首页</title>
+  <!-- 引入vue -->
+  <script src="scripts/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="scripts/axios/dist/axios.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="scripts/element-ui/theme-cool/index.css">
+  <!-- 引入element组件库 -->
+  <script src="scripts/element-ui/index.js"></script>
+  <!-- 引入公共内容 -->
+  <script src="common.js"></script>
+  <script src="scripts/components/button-group.js">
+  </script>
+  <script src="scripts/components/cool-table.js">
+  </script>
+  <script src="scripts/components/cool-query.js">
+  </script>
+  <script src="scripts/components/cool-form.js">
+  </script>
+  <!-- 引入v-charts -->
+  <script src="//cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/v-charts/lib/index.min.js"></script>
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/v-charts/lib/style.min.css">
+
+  <style>
+    [v-cloak] {
+      display: none
+    }
+
+    .el-tabs__header {
+      background-color: #f5f7fa;
+      border-bottom: 1px solid #e4e7ed;
+      margin: 0;
+    }
+
+    .el-tabs,
+    .el-tabs__content,
+    .el-tab-pane {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .el-tabs__header {
+      z-index: 1;
+      margin: 0;
+    }
+
+    .el-tabs__content {
+      box-sizing: border-box;
+      margin-top: -40px;
+      border-top-style: solid;
+      border-top-width: 40px;
+      border-top-color: rgba(0, 0, 0, 0);
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    .rawdialog .el-dialog__body {
+      padding-top: 0px
+    }
+
+    .el-form--inline .el-form-item {
+      margin-right: 0px
+    }
+
+    .el-table th>.cell {
+      min-width: 95px
+    }
+
+    .el-table th {
+      padding: 5px 0
+    }
+  </style>
+</head>
+
+<body>
+  <div id="vm" v-cloak style="height:100%">
+    <el-container style="height:100%;border:1px solid #DCDFE6;">
+      <!-- 侧边查询 -->
+      <el-aside width="220px" style="background:#fff;border-right:1px solid #DCDFE6;">
+        <el-card class="box-card" header="最新公告">
+        </el-card>
+        <el-card class="box-card" header="消息推送" style="margin-top:10px">
+        </el-card>
+      </el-aside>
+
+      <el-container style="height:100%;">
+        <!-- 顶端按钮 -->
+        <el-header style="padding:0px" height="200px">
+          <el-tabs style="height:100%;border-bottom:1px solid #e4e7ed" type="card">
+            <el-tab-pane label="待处理订单">
+              <cool-table :columns="columns1" border="border"></cool-table>
+            </el-tab-pane>
+            <el-tab-pane label="交期提醒">
+              <cool-table :columns="columns2" border="border"></cool-table>
+            </el-tab-pane>
+            <el-tab-pane label="逾期订单提醒">
+              <cool-table :columns="columns3" border="border"></cool-table>
+            </el-tab-pane>
+            <el-tab-pane label="变更订单">
+              <cool-table :columns="columns4" border="border"></cool-table>
+            </el-tab-pane>
+          </el-tabs>
+        </el-header>
+        <!-- 主体内容 -->
+        <el-main style="padding:5px 0px 0px 5px;height:100%">
+          <el-row style="height: 100%">
+            <el-col :span="12" style="height:100%">
+              <div style="height:50%">
+                <div style="height:10%;text-align:center">新增订单</div>
+                <div style="height:90%">
+                  <ve-line :data="charts.data" :extend="charts.extend" height="100%" width="100%"></ve-line>
+                </div>
+              </div>
+              <div style="height:50%">
+                <div style="height:10%;text-align:center">新增订单</div>
+                <div style="height:90%">
+                  <ve-line :data="charts.data" :extend="charts.extend" height="100%" width="100%"></ve-line>
+                </div>
+              </div>
+            </el-col>
+            <el-col :span="12" style="height:100%">
+              <div style="height:10%;text-align:center">新增订单</div>
+              <div style="height:90%">
+                <ve-line :data="charts.data" :extend="charts.extend" height="100%" width="100%"></ve-line>
+              </div>
+            </el-col>
+          </el-row>
+        </el-main>
+        <el-footer height="200px" style="padding:0;border-top:1px solid #e4e7ed">
+          <el-tabs style="height:100%;" type="card">
+            <el-tab-pane label="库存预警">
+              <cool-table :columns="columns5" border="border"></cool-table>
+            </el-tab-pane>
+          </el-tabs>
+        </el-footer>
+      </el-container>
+    </el-container>
+
+  </div>
+
+  <script>
+    // var config = 'http://198.168.1.199:8081'
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#vm',
+        data: {
+          urlIndex: config + '/home/index',
+          charts: {
+            data: {
+              columns: ['日期', '新增订单数量', ],
+              rows: [{
+                  '日期': '1/1',
+                  '新增订单数量': 4,
+                },
+                {
+                  '日期': '1/2',
+                  '新增订单数量': 0,
+                },
+                {
+                  '日期': '1/3',
+                  '新增订单数量': 6,
+                },
+                {
+                  '日期': '1/4',
+                  '新增订单数量': 1,
+                },
+                {
+                  '日期': '1/5',
+                  '新增订单数量': 0,
+                },
+                {
+                  '日期': '1/6',
+                  '新增订单数量': 3,
+                }
+              ]
+            },
+            extend: {
+              grid: {
+                top: '10px',
+                right: '2%',
+                left: '2%',
+                bottom: '2%',
+              },
+              series: {
+                smooth: false
+              },
+              xAxis: {
+                axisLabel: {
+                  // fontSize: 20,
+                  // color: '#fff',
+                }
+              },
+              yAxis: {
+                position: 'left',
+                name: '新增数量',
+                nameTextStyle: {
+                  // fontSize: 20,
+                  // color: '#fff',
+                },
+                axisLabel: {
+                  // fontSize: 20,
+                  // color: '#fff'
+                }
+              },
+              legend: {
+                show: false,
+                itemGap: 30,
+                textStyle: {
+                  // color: '#fff',
+                  // fontSize: 20
+                }
+              }
+            }
+          },
+          columns1: [{
+              prop: 'index',
+              label: '序号',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: '',
+              label: '订单号',
+              width: '160',
+              fixed: 'fixed'
+            },
+            {
+              prop: '',
+              label: '项目名称'
+            },
+            {
+              prop: '',
+              label: '项目编号'
+            },
+            {
+              prop: '',
+              label: '订单状态'
+            },
+            {
+              prop: '',
+              label: '最近处理日期'
+            }
+          ],
+          columns2: [{
+              prop: 'index',
+              label: '序号',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: '',
+              label: '订单号',
+              width: '160',
+              fixed: 'fixed'
+            },
+            {
+              prop: '',
+              label: '项目名称'
+            },
+            {
+              prop: '',
+              label: '项目编号'
+            },
+            {
+              prop: '',
+              label: '交货日期'
+            },
+            {
+              prop: '',
+              label: '回复日期'
+            },
+            {
+              prop: '',
+              label: '最近处理日期'
+            }
+          ],
+          columns3: [{
+              prop: 'index',
+              label: '序号',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: '',
+              label: '订单号',
+              width: '160',
+              fixed: 'fixed'
+            },
+            {
+              prop: '',
+              label: '项目名称'
+            },
+            {
+              prop: '',
+              label: '项目编号'
+            },
+            {
+              prop: '',
+              label: '交货日期'
+            },
+            {
+              prop: '',
+              label: '逾期天数'
+            },
+            {
+              prop: '',
+              label: '最近处理日期'
+            }
+          ],
+          columns4: [{
+              prop: 'index',
+              label: '序号',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: '',
+              label: '订单号',
+              width: '160',
+              fixed: 'fixed'
+            },
+            {
+              prop: '',
+              label: '业务员'
+            },
+            {
+              prop: '',
+              label: '申请人'
+            },
+            {
+              prop: '',
+              label: '申请原因'
+            },
+            {
+              prop: '',
+              label: '申请日期'
+            },
+            {
+              prop: '',
+              label: '提交时间'
+            },
+            {
+              prop: '',
+              label: '状态'
+            },
+            {
+              prop: '',
+              label: '备注'
+            }
+          ],
+          columns5: [{
+              prop: 'index',
+              label: '序号',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: '',
+              label: '仓库',
+              width: '160',
+              fixed: 'fixed'
+            },
+            {
+              prop: '',
+              label: '物料名称'
+            },
+            {
+              prop: '',
+              label: '数量'
+            },
+            {
+              prop: '',
+              label: '库存上限'
+            },
+            {
+              prop: '',
+              label: '库存下限'
+            },
+            {
+              prop: '',
+              label: '状态'
+            },
+            {
+              prop: '',
+              label: '备注'
+            }
+          ],
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          this.getData()
+        },
+        methods: {
+
+          //获取数据
+          getData: function() {
+            axios.post(this.urlIndex)
+                .then(resp => {
+                console.log(resp);
+            }).catch((error => {
+                this.$message('服务器异常，请联系管理人员')
+            }))
+          },
+        },
+      })
+    }
+  </script>
+</body>
+
+</html>
