@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>新增原材料领料申请</title>
+  <!-- 引入vue -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  <!-- 引入element组件库 -->
+  <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+  <!-- 引入公共内容 -->
+  <script src="../../../common.js"></script>
+  <script src="../../../scripts/components/button-group.js">
+  </script>
+  <script src="../../../scripts/components/inventory-table.js">
+  </script>
+  <script src="../../../scripts/components/dialog-form.js">
+  </script>
+</head>
+
+<style>
+  [v-cloak] {
+    display: none
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0
+  }
+
+  .rawdialog .el-dialog__body {
+    padding-top: 0px
+  }
+
+  .el-form--inline .el-form-item {
+    margin-right: 0px
+  }
+
+  #root {
+    visibility: hidden;
+  }
+</style>
+
+<body>
+  <div id="root" v-cloak style="height:100%">
+    <el-container ref="container" style="height:100%;">
+      <!-- border:1px solid #7a9973 -->
+      <el-header style="height:29px;padding-left:0px">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="padding:0;">
+        <!-- border-top:1px solid #7a9973 -->
+        <el-form :inline="true" size="mini">
+          <el-form-item style="margin:5px 0px 5px 5px" label="领料申请单号" >
+            <el-input type="text" style="width: 100%;" :disabled="disabled" :value=
+            "currentNo"></el-input>
+          </el-form-item>
+          <el-form-item v-if="currentNo != undefined" style="margin:5px 0px 5px 5px" label="备注">
+            <el-input type="text" style="width: 100%;" v-model="description" ></el-input>
+          </el-form-item>
+           <el-form-item v-else style="margin:5px 0px 5px 5px" label="备注" v-model="description1">
+            <el-input type="text" style="width: 100%;"  ></el-input>
+          </el-form-item>
+        </el-form>
+        <inventory-table :pag="false" v-loading="waiting" :data="rawData" :columns="productColumns" :total="total" :layout="layout" :page-size.sync="pagination.pageSize" :current-page.sync="pagination.page" :pager-count="pagerCount" @selection="selection" ></inventory-table>
+      </el-main>
+      <!-- 新建对话框 -->
+      <el-dialog title="编辑原材料申请" :visible.sync="dialogVisible" width="600px">
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="saveData" size="mini">保 存</el-button>
+          <el-button @click="dialogVisible=false" size="mini">取 消</el-button>          
+        </el-button-group>
+        <el-form :model="form" :inline="true" size="mini" style="border:1px solid #7A9973;padding-top:20px">
+          <el-form-item v-for="item in productColumns" :label="item.label" :label-width="formLabelWidth">
+            <el-input v-if="item.label == '领取数量'" v-model="currentPackQty" auto-complete="off"></el-input>
+            <el-input v-else="" disabled :value="item.value" auto-complete="off"></el-input>
+          </el-form-item>
+        </el-form>
+      </el-dialog>
+    </el-container>
+  </div>
+
+  <script>
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#root',
+        data: {
+          // url
+          urlGetEditData: testConfig + '/pickMaterial/hdr/queryDetail',//获取领料详情
+          urlConfirmData: testConfig + '/pickMaterial/dlt/save',//保存领料明细
+          urlSaveEditDate: testConfig + '/pickMaterial/dlt/edit',//保存编辑明细
+          
+          description: '',//编辑时的description
+          description1:'',//新建保存时的description
+          waiting: false,
+          rawData: [],
+          fFormNo: undefined,
+          selected: [],
+          disabled:true,
+          items: [],
+          currentPackQty:null, //当前可编辑的数量
+          currentPackQtyId:null,//可编辑的数量对应的id
+          // 分页
+          total: 0,
+          pagination: {
+            page: 1,
+            pageSize: 10
+          },
+          //新建对话框数据
+          dialogVisible: false,
+          formLabelWidth: '100px',
+          form: {},
+          customerTypes: [],
+          size: 'mini',
+          currentData: undefined,
+          // 分页样式
+          layout: 'total,prev,pager,next,jumper',
+          pagerCount: 5,
+          //表格表头
+          productColumns: [ {
+            prop: "name",
+            label: "名称",
+            width: '100',
+            fixed: 'fixed',
+            value:undefined
+          }, {
+            prop: "code",
+            label: "编码",
+            value:undefined
+          }, {
+            prop: "type",
+            label: "类型",
+            value:undefined
+          }, {
+            prop: "format",
+            label: "规格",
+            value:undefined
+          },  {
+            prop: "meterial1",
+            label: "主材质",
+            value:undefined
+          },{
+            prop: "color1",
+            label: "主花色",
+            value:undefined
+          }, {
+            prop: "qty",
+            label: "领取数量",
+            value:undefined
+          }, {
+            prop: "leave",
+            label: "剩余产品数量",
+            value:undefined
+          },{
+            prop: "description",
+            label: "备注",
+            value:undefined
+          }],
+          // 按钮样式
+          buttons: [{
+              text: '查询',
+              size: 'mini',
+              icon: 'el-icon-search',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '保存',
+              size: 'mini',
+              icon: 'el-icon-upload',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },{
+              text: '编辑',
+              size: 'mini',
+              icon: 'el-icon-edit',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '删除',
+              size: 'mini',
+              icon: 'el-icon-delete',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '返回',
+              size: 'mini',
+              icon: 'el-icon-back',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            }
+          ],
+          // 当前状态
+          currentRow: undefined,
+          currentNo: '',
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          this.$el.style.visibility = 'visible'
+          var str = window.location.hash
+          console.log(str)
+          this.currentNo = str.split(/[#?]/)[1]
+          this.description = str.split(/[#?]/)[2]
+          console.log(this.currentNo);
+          if (this.currentNo != undefined) {
+            this.getEditData()
+          }
+        
+          setInterval(() => {
+            if (this.rawData === [] || this.rawData.length === 0) {
+              this.buttons[1].disabled = true
+            } else this.buttons[1].disabled = false
+            // this.buttons[1].disabled = this.rawData === [] ? true : false
+            this.buttons[2].disabled = this.selected.length === 1 ? false : true
+            this.buttons[3].disabled = this.selected.length === 0 ? true : false
+          }, 100)
+        },
+        methods: {
+          searchData() {
+            window.parent.vm.dialogs[1].src = '../../../stockManage/raw.html#applyMaterial'
+            setTimeout(() => {
+              window.parent.vm.getDialog('dialog2').visible = !window.parent.vm.getDialog('dialog2').visible
+            }, 100)
+          },
+
+          // 获取编辑信息
+          getEditData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetEditData, {
+                  formNo:this.currentNo
+              })
+              .then(function(res) {
+                console.log(res)
+                res = res.data
+                if (res.code == 0 && res.data) {
+                  console.log(res)
+                  _this.total = res.data.total
+                  _this.rawData = res.data.records
+                }
+                _this.waiting = false
+                console.log(_this.rawData)
+              })
+              .catch(function(error) {
+                console.log(error);
+              })
+          },
+
+          // 确认操作 
+          confirmData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlConfirmData, {
+                kind:"成品",
+                description:this.description1,
+                dlt:this.rawData
+              })
+              .then(function(res) {
+                console.log(res)
+                _this.waiting = false
+                window.parent.vm.getDialog('dialog1').visible = !window.parent.vm.getDialog('dialog1').visible
+                window.parent.vm.getAllData()
+              })
+              .catch(function(error) {
+                console.log(error);
+              })
+          },
+
+          // 保存编辑信息
+          saveEditData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlSaveEditDate, {
+                formNo:this.currentNo,
+                description:this.description,
+                dlt:this.rawData
+              })
+              .then(function(res) {
+                console.log(res)
+                _this.waiting = false
+                window.parent.vm.getDialog('dialog1').visible = !window.parent.vm.getDialog('dialog1').visible
+                window.parent.vm.getAllData()
+              })
+              .catch(function(error) {
+                console.log(error);
+              })
+          },
+          // 删除操作
+          delTab() {
+            this.items.forEach(p => {
+              this.rawData.splice(this.rawData.indexOf(p), 1)
+            })
+          },
+          // 编辑操作
+          editData(){
+            this.dialogVisible = true
+          },
+          //弹窗保存操作
+          saveData(){
+            this.rawData = this.rawData.map((item,index) => {
+              if(item.id == this.currentPackQtyId){
+                item.qty =this.currentPackQty 
+                return item;
+              }else {
+                return item;
+              }                          
+            })
+            this.dialogVisible = false
+          },
+         // 表格多选操作
+          selection(arg) {
+            if (arg.selectionchange.length != 0) {
+              this.items = []
+              this.selected = arg.selectionchange
+              for(i in this.selected[0]){
+                console.log(i)
+                this.productColumns.forEach(p =>{
+                  if(p.prop == i){
+                    p.value = this.selected[0][i]
+                  }
+                })
+              }
+              this.currentPackQty = this.productColumns[6].value
+              this.currentPackQtyId = this.selected[0].id
+              console.log(this.currentPackQty,this.currentPackQtyId);
+            } else this.selected = []
+          },
+          // 按钮点击事件
+          buttonsevent: function(args) {
+            switch (args.currentTarget.textContent) {
+              case '查询':
+                {
+                  this.searchData();
+                  console.log("查询操作");
+                  break
+                }
+              case '保存':
+                { 
+                   if (this.currentNo == '' || this.currentNo == null) {
+                    this.confirmData()
+                  } else 
+                  this.saveEditData()
+                  break
+                }
+              case '删除':
+                {
+                  this.delTab()
+                  console.log('删除操作',args.currentTarget);
+                  break
+                }
+              case '编辑':
+                {
+                  this.editData()
+                  console.log('编辑操作')
+
+                  break
+                }
+              default:
+                console.log("！未知错误！")
+                break
+            }
+          },
+
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>

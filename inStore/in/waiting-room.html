@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>原材料待进仓管理</title>
+  <!-- 引入vue -->
+  <script src="../../scripts/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="../../scripts/axios/dist/axios.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="../../scripts/element-ui/theme-cool/index.css">
+  <!-- 引入element组件库 -->
+  <script src="../../scripts/element-ui/index.js"></script>
+  <!-- 引入公共内容 -->
+  <link rel="stylesheet" href="../../css/main.css">
+  <script src="../../common.js"></script>
+  <script src="../../scripts/components/button-group.js">
+  </script>
+  <script src="../../scripts/components/cool-table.js">
+  </script>
+  <script src="../../scripts/components/inventory-query.js">
+  </script>
+</head>
+
+<style>
+  [v-cloak] {
+    display: none
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0
+  }
+
+  .el-tabs--border-card>.el-tabs__content {
+    padding: 0px
+  }
+
+  .el-table th>.cell {
+    min-width: 95px
+  }
+
+  .el-table td,
+  .el-table th {
+    padding: 5px 0
+  }
+
+  #root {
+    visibility: hidden;
+  }
+</style>
+
+<body>
+  <div id="root" v-cloak style="height:100%">
+    <el-container style="height:100%;">
+      <el-header style="height:auto;padding-left:0px">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top:1px solid #7A9973;">
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <inventory-query :origin-condition="originCondition" @getcondition="getCondition"></inventory-query>
+          </el-aside>
+          <!-- <inventory-table :pag="false" v-loading="waiting" :data="productData" :columns="productColumns" :total="total" :layout="layout" :page-size.sync="pagination.pageSize" :current-page.sync="pagination.page" :pager-count="pagerCount" @selection="selection">
+          </inventory-table> -->
+          <cool-table v-loading="waiting" :data="productData" :columns="productColumns" border="border" @table-selection-change="selection"></cool-table>
+        </el-container>
+      </el-main>
+    </el-container>
+  </div>
+
+  <script>
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#root',
+        data: {
+          // url集合
+          urlGetData: config + '/storeIn/dlt/queryList',
+          dialogVisible: false,
+          waiting: false,
+          productData: [],
+          currentRow: undefined,
+          selected: [],
+          items: [],
+          productColumns: [{
+            type: 'selection'
+          }, {
+            prop: 'index',
+            label: "#",
+            fixed: 'fixed',
+            width: '50px'
+          }, {
+            prop: "name",
+            label: "名称",
+            width: '160',
+            fixed: 'fixed'
+          }, {
+            prop: "code",
+            label: "编码"
+          }, {
+            prop: "type",
+            label: "类型"
+          }, {
+            prop: "format",
+            label: "规格"
+          }, {
+            prop: "meterial1",
+            label: "主材质"
+          }, {
+            prop: "color1",
+            label: "主花色"
+          }, {
+            prop: "rest",
+            label: "数量"
+          }, {
+            prop: "unit",
+            label: "单位"
+          }, {
+            prop: "description",
+            label: "备注"
+          }],
+          buttons: [{
+              text: '查询',
+              size: 'mini',
+              icon: 'el-icon-search',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '确认',
+              size: 'mini',
+              icon: 'el-icon-upload',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            // {
+            //   text: '返回',
+            //   size: 'mini',
+            //   icon: 'el-icon-back',
+            //   nativeType: '',
+            //   disabled: false,
+            //   plain: '',
+            //   autofocus: false,
+            //   round: '',
+            //   key: undefined
+            // },
+            {
+              text: '导出',
+              size: 'mini',
+              icon: 'el-icon-download',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            }
+          ],
+          condition: {},
+          // 分页
+          total: 0,
+          pagination: {
+            page: 1,
+            pageSize: 100000
+          },
+          layout: 'total,prev,pager,next,jumper',
+          pagerCount: 5,
+          // 查询条件
+          originCondition: [{
+              value: '',
+              name: "类别",
+              fieldName: "kind",
+              form: "input",
+              disabled: true
+            },
+            // {
+            //   value: '',
+            //   name: "类别",
+            //   fieldName: "kind",
+            //   form: "select",
+            //   clearable: false,
+            //   options: [{
+            //       value: '原材料',
+            //       label: '原材料'
+            //     },
+            //     {
+            //       value: '成品',
+            //       label: '成品'
+            //     },
+            //     {
+            //       value: '半成品',
+            //       label: '半成品'
+            //     },
+            //   ]
+            // },
+            {
+              value: '',
+              name: "名称",
+              fieldName: "name",
+              form: "input"
+            },
+            {
+              value: '',
+              name: "编码",
+              fieldName: "code",
+              form: "input"
+            }
+          ],
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          this.$el.style.visibility = 'visible'
+          var str = window.location.hash
+          str = str.split(/[#?]/)[1]
+          // if (this.currentId != undefined) {
+          //   this.getEditData()
+          // }
+          switch (str) {
+            case 'raw':
+              {
+                this.originCondition[0].value = '原材料'
+                this.condition.kind = '原材料'
+                break;
+              }
+            case 'product':
+              {
+                this.originCondition[0].value = '成品'
+                this.condition.kind = '成品'
+                break;
+              }
+            case 'semi':
+              {
+                this.originCondition[0].value = '半成品'
+                this.condition.kind = '半成品'
+                break;
+              }
+            default:
+              this.$message("！未知错误！")
+              break
+          }
+          setInterval(() => {
+            this.buttons[1].disabled = this.selected.length === 0 ? true : false
+          }, 100)
+        },
+        methods: {
+          noDataAlert() {
+            this.$message({
+              message: '数据不存在！',
+              type: 'warning'
+            });
+          },
+          //获取传出的查询参数
+          getCondition(arg) {
+            // console.log(arg);
+            this.condition = arg
+            console.log(this.condition);
+          },
+          // 表格多选操作
+          selection(arg) {
+            if (arg.length != 0) {
+              this.items = []
+              this.selected = arg
+              // console.log(this.selected);
+              this.selected.forEach(p => {
+                this.items.push(p)
+              })
+            } else this.selected = []
+          },
+          // 获取待进仓内容列表
+          getData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetData, {
+                condition: this.condition,
+                current: this.pagination.page,
+                offset: this.pagination.pageSize
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'waiting');
+                if (test) {
+                  res = res.data
+                  if (res.code == 0 && res.data) {
+                    _this.total = res.data.total
+                    res.data.records.forEach((p, index) => {
+                      p.index = (index + 1)
+                    })
+                    _this.productData = res.data.records
+                  } else {
+                    _this.noDataAlert()
+                  }
+                  _this.waiting = false
+                }
+              })
+          },
+          confirmData() {
+            window.parent[0].vm.rawData = this.items
+            console.log(this.items);
+            window.parent.vm.getDialog('dialog2').visible = !window.parent.vm.getDialog('dialog2').visible
+          },
+          // 按钮点击事件
+          buttonsevent: function(args) {
+            switch (args.currentTarget.textContent) {
+              case '查询':
+                {
+                  // if (this.condition.kind == undefined) {
+                  //   this.noKindAlert()
+                  // } else
+                  this.getData();
+                  break
+                }
+              case '确认':
+                {
+                  this.confirmData()
+                  break
+                }
+                // case '返回':
+                //   {
+                //     console.log('返回操作');
+                //     break
+                //   }
+              case '导出':
+                {
+                  this.$message('开发中');
+                  break
+                }
+              default:
+                console.log("！未知错误！")
+                break
+            }
+          },
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>

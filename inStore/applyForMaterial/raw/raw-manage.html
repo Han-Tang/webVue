@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>原材料库存管理</title>
+  <!-- 引入vue -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+  <!-- 引入element组件库 -->
+  <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+  <!-- 引入公共内容 -->
+  <script src="../../../common.js"></script>
+  <script src="../../../scripts/components/button-group.js">
+  </script>
+  <script src="../../../scripts/components/inventory-table.js">
+  </script>
+  <script src="../../../scripts/components/inventory-query.js"> 
+  </script>
+</head>
+
+<style>
+  [v-cloak] {
+    display: none
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0
+  }
+
+  .el-tabs--border-card>.el-tabs__content {
+    padding: 0px
+  }
+
+  #root {
+    visibility: hidden;
+  }
+
+</style>
+
+<body>
+  <div id="root" v-cloak style="height:100%">
+    <el-container style="height:100%;">
+      <el-aside width="220px" style="background:#fff;border-right:1px solid #7a9973;font-size:12px;">
+        <div style="height:29px;border-bottom:1px solid #7a9973;line-height:29px;text-align:center;background: #eff8ed;color: black;">
+          查询条件
+        </div>
+        <inventory-query :origin-condition="originCondition" @getcondition="getCondition"></inventory-query>
+      </el-aside>
+      <el-container ref="container">
+        <el-header style="height:29px;padding-left:0px">
+          <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+        </el-header>
+        <el-main style="padding:0px 0px 0px 0px;border-top:1px solid #7a9973;">
+          <inventory-table :pag="true" v-loading="waiting" :data="productData" :columns="productColumns" :total="total" :layout="layout" :page-size.sync="pagination.pageSize" :current-page.sync="pagination.page" :pager-count="pagerCount" @selection="selection"
+            >
+          </inventory-table>
+        </el-main>
+        <!-- <el-footer height="260px" style="padding:0">
+          <el-tabs type="border-card">
+            <el-tab-pane>
+              <span slot="label"> 出仓单明细</span>
+              <inventory-table :pag="false" v-loading="waiting" :data="productData2" :columns="productColumns2" :total="total" :layout="layout" :page-size.sync="pagination.pageSize" :current-page.sync="pagination.page" :pager-count="pagerCount"
+                height="222px">
+              </inventory-table>
+            </el-tab-pane>
+          </el-tabs>
+        </el-footer> -->
+      </el-container>
+    </el-container>
+  </div>
+
+  <script>
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#root',
+        data: {
+          // url集合
+          // urlGetData: 'http://198.168.1.199:8081/storeIn/dlt/queryList'
+          urlGetData: testConfig + '/storeManage/dlt/queryList',
+          urlGetDltData: config + '/storeOut/dlt/queryListByDeliveryHdr',
+          dialogVisible: false,
+          waiting: false,
+          productData: [],
+          // productData2: [],
+          currentRow: undefined,
+          fFormNo: undefined,
+          sFormNo: undefined,
+          selected: [],
+          items: [],
+          productColumns: [{
+            prop: "storeLocation",
+            label: "存放仓库"
+          }, {
+            prop: "code",
+            label: "物料编码"
+          }, {
+            prop: "name",
+            label: "物料名称"
+          }, {
+            prop: "packQty",
+            label: "库存数量"
+          }, {
+            prop: "using",
+            label: "占用数量"
+          }, {
+            prop: "qty",
+            label: "可用库存"
+          }, {
+            prop: "",
+            label: "物料规格"
+          }, {
+            prop: "meterial1",
+            label: "主材质"
+          }, {
+            prop: "color1",
+            label: "主花色"
+          },{
+            prop: "",
+            label: "主配色"
+          }, {
+            prop: "",
+            label: "物料类型"
+          }, {
+            prop: "",
+            label: "物料型号"
+          },{
+            prop: "",
+            label: "单位"
+          },{
+            prop: "",
+            label: "图纸号"
+          },{
+            prop: "description",
+            label: "备注"
+          }],
+          buttons: [{
+              text: '查询',
+              size: 'mini',
+              icon: 'el-icon-search',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            }, {
+              text: '保存',
+              size: 'mini',
+              icon: 'el-icon-upload',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '返回',
+              size: 'mini',
+              icon: 'el-icon-back',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },{
+              text: '导出',
+              size: 'mini',
+              icon: 'el-icon-download',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            }
+          ],
+          condition: {},
+          // 分页
+          total: 0,
+          pagination: {
+            page: 1,
+            pageSize: 10
+          },
+          layout: 'total,prev,pager,next,jumper',
+          pagerCount: 5,
+          // 查询条件
+          originCondition: [{
+              value: '',
+              name: "物料编码",
+              fieldName: "fFormNo",
+              form: "input"
+            },
+            {
+              value: '',
+              name: "物料名称",
+              fieldName: "sFormNo",
+              form: "input"
+            },
+            {
+              value: '',
+              name: "产品系列",
+              fieldName: "sFormNo",
+              form: "input"
+            },
+            {
+              value: '',
+              name: "产品型号",
+              fieldName: "sFormNo",
+              form: "input"
+            },
+            {
+              value: '',
+              name: "存放仓库",
+              fieldName: "sFormNo",
+              form: "select",
+              clearable: true,
+              options: []
+            },
+            {
+              value: '',
+              name: "物料类型",
+              fieldName: "sFormNo",
+              form: "select",
+              clearable: true,
+              options: []
+            }
+          ],
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          this.$el.style.visibility = 'visible'
+          var str = window.location.hash
+          str = str.split(/[#?]/)[1]
+          if (this.currentId != undefined) {
+            this.getEditData();
+          }
+          setInterval(() => {
+            this.buttons[1].disabled = this.selected.length === 1 ? false : true
+          }, 100)
+          axios.post(this.urlGetInfo, {
+            type: 'ProductNameType'
+          }).then(res => {
+            console.log(res)
+            this.originCondition[4].options = res.data.data
+          })
+        },
+        methods: {
+          noDataAlert() {
+            this.$message({
+              message: '数据不存在！',
+              type: 'warning'
+            });
+          },
+          //获取传出的查询参数
+          getCondition(arg) {
+            // console.log(arg);
+            this.condition = arg
+            console.log(this.condition);
+          },
+          // 表格多选操作
+          selection(arg) {
+            if (arg.selectionchange.length != 0) {
+              this.items = []
+              this.selected = arg.selectionchange
+              console.log(this.selected);
+              this.selected.forEach(p => {
+                this.items.push(p)
+              })
+              console.log(this.items[0].code)
+            }
+             else this.selected = []
+          },
+          // 提取获取从表
+          // getDltData() {
+          //   console.log(1)
+          //   this.waiting = true
+          //   var _this = this
+          //   axios.post(this.urlGetDltData, {
+          //       fFormNo: this.fFormNo
+          //     })
+          //     .then(function(res) {
+          //       console.log(res)
+          //       res = res.data
+          //       if (res.code == 0 && res.data) {
+          //         _this.productData2 = res.data.records
+          //       } else {
+          //         _this.productData2 = []
+          //       }
+          //       _this.waiting = false
+          //     })
+          // },
+          // 表格点击事件
+          // rowclick(arg) {
+          //   console.log(2)
+          //   if (arg !== undefined) {
+          //     this.currentRow = arg.rowclickdata
+          //     this.currentId = arg.rowclickdata.id
+          //     this.fFormNo = arg.rowclickdata.fFormNo
+          //     this.sFormNo = arg.rowclickdata.sFormNo
+          //     // this.getDltData()
+          //     console.log(arg.rowclickdata)
+          //   }
+          // },
+          // 获取原材料库存管理数据
+          getData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetData, {
+                condition: {
+                    current:1,
+                    offset:10,
+                    code:"",
+                    name:"",
+                    serial:"",
+                    model:"",
+                    storeName:"",
+                    type:"",
+                    kind:"成品"
+                    }
+              })
+              .then(function(res) {
+                console.log(res)
+                res = res.data
+                console.log(res.code)
+                _this.productData = []
+                if (res.code == 0 && res.data) {
+                  _this.total = res.data.total
+                  _this.productData = res.data.records
+                } else {
+                  _this.noDataAlert()
+                }
+                _this.waiting = false
+
+              })
+              .catch(function(error) {
+                console.log(error);
+              })
+          },
+          confirmData() {
+            // window.parent[0].vm.rawData = this.productData2
+            window.parent[0].vm.fFormNo = this.fFormNo
+            // console.log(this.productData2);
+            window.parent.vm.getDialog('dialog2').visible = !window.parent.vm.getDialog('dialog2').visible
+          },
+          // 按钮点击事件
+          buttonsevent: function(args) {
+            switch (args.currentTarget.textContent) {
+              case '查询':
+                {
+                  // if (this.condition.kind == undefined) {
+                  //   this.noKindAlert()
+                  // } else
+                  this.getData();
+                  break
+                }
+              case '保存':
+                {
+                  this.confirmData()
+                  break
+                }
+              case '返回':
+                {
+                  // this.delTab()
+                  console.log('返回操作');
+                  break
+                }
+              default:
+                console.log("！未知错误！")
+                break
+            }
+          },
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>

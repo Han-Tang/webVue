@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>新增原材料进仓单</title>
+  <!-- 引入vue -->
+  <script src="../../../scripts/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="../../../scripts/axios/dist/axios.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="../../../scripts/element-ui/theme-cool/index.css">
+  <!-- 引入element组件库 -->
+  <script src="../../../scripts/element-ui/index.js"></script>
+  <!-- 引入公共内容 -->
+  <script src="../../../common.js"></script>
+  <script src="../../../scripts/components/button-group.js">
+  </script>
+  <script src="../../../scripts/components/inventory-table.js">
+  </script>
+  <script src="../../../scripts/components/dialog-form.js">
+  </script>
+</head>
+
+<style>
+  [v-cloak] {
+    display: none
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0
+  }
+
+  .rawdialog .el-dialog__body {
+    padding-top: 0px
+  }
+
+  .el-form--inline .el-form-item {
+    margin-right: 0px
+  }
+  .el-table th>.cell {
+    min-width: 95px
+  }
+
+  .el-table th {
+    padding: 5px 0
+  }
+  #root {
+    visibility: hidden;
+  }
+</style>
+
+<body>
+  <div id="root" v-cloak style="height:100%">
+    <el-container ref="container" style="height:100%;">
+      <!-- border:1px solid #7a9973 -->
+      <el-header style="height:29px;padding-left:0px">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="padding:0;border-top:1px solid #7a9973">
+        <!-- border-top:1px solid #7a9973 -->
+        <el-form :inline="true" size="mini">
+          <el-form-item style="margin:5px 0px 5px 5px" label="入库日期">
+            <el-date-picker v-model="datevalue" type="date" placeholder="选择日期" style="width: 100%;"></el-date-picker>
+          </el-form-item>
+        </el-form>
+        <inventory-table :pag="false" :show-input="true" v-loading="waiting" :data="rawData" :columns="productColumns" :total="total" :layout="layout" :page-size.sync="pagination.pageSize" :current-page.sync="pagination.page" :pager-count="pagerCount"
+          @selection="selection"></inventory-table>
+      </el-main>
+    </el-container>
+  </div>
+
+  <script>
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#root',
+        data: {
+          urlGetEditData: config + '/storeIn/hdr/queryDetail',
+          urlConfirmData: config + '/storeIn/dlt/save',
+
+          datevalue: '',
+          waiting: false,
+          rawData: [],
+          selected: undefined,
+          items: [],
+          // 分页
+          total: 0,
+          pagination: {
+            page: 1,
+            pageSize: 10
+          },
+          // 分页样式
+          layout: 'total,prev,pager,next,jumper',
+          pagerCount: 5,
+          //表格表头
+          productColumns: [{
+              prop: "name",
+              label: "名称",
+              width: '100',
+              fixed: 'left'
+            }, {
+              prop: "code",
+              label: "编码"
+            }, {
+              prop: "type",
+              label: "类型"
+            }, {
+              prop: "format",
+              label: "规格"
+            }, {
+              prop: "meterial1",
+              label: "主材质"
+            }, {
+              prop: "color1",
+              label: "主花色"
+            },
+            // {
+            //   prop: "qty",
+            //   label: "入库数量"
+            // },
+            {
+              prop: "rest",
+              label: "剩余数量"
+            },
+            //  {
+            //   prop: "inPackQty",
+            //   label: "入库包装数量"
+            // },
+            {
+              prop: "inPackLeave",
+              label: "剩余包装数量"
+            }, {
+              prop: "description",
+              label: "备注"
+            }
+          ],
+          // 按钮样式
+          buttons: [{
+              text: '查询',
+              size: 'mini',
+              icon: 'el-icon-search',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '确认',
+              size: 'mini',
+              icon: 'el-icon-upload',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '删除',
+              size: 'mini',
+              icon: 'el-icon-delete',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            // {
+            //   text: '返回',
+            //   size: 'mini',
+            //   icon: 'el-icon-back',
+            //   nativeType: '',
+            //   disabled: false,
+            //   plain: '',
+            //   autofocus: false,
+            //   round: '',
+            //   key: undefined
+            // },
+          ],
+          // 当前状态
+          currentRow: undefined,
+          currentId: '',
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          this.$el.style.visibility = 'visible'
+          var str = window.location.hash
+          this.currentId = str.split(/[#?]/)[1]
+          console.log(this.currentId);
+          if (this.currentId != undefined) {
+            this.getEditData()
+          }
+          // 计算表格高度
+          setInterval(() => {
+            if (this.rawData === [] || this.rawData.length === 0) {
+              this.buttons[1].disabled = true
+            } else this.buttons[1].disabled = false
+            this.buttons[2].disabled = this.selected === undefined ? true : false
+          }, 100)
+          // this.getData()
+        },
+        methods: {
+          searchData() {
+            window.parent.vm.dialogs[1].src = '../waiting-room.html#raw'
+            setTimeout(() => {
+              window.parent.vm.getDialog('dialog2').visible = !window.parent.vm.getDialog('dialog2').visible
+            }, 100)
+          },
+
+          // 获取编辑信息
+          getEditData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetEditData, {
+                storeInId: this.currentId
+              })
+              .then(function(res) {
+                // console.log(res)
+                res = res.data
+                if (res.code == 0 && res.data) {
+                  _this.total = res.data.total
+                  _this.rawData = res.data.records
+                }
+                _this.waiting = false
+              })
+              .catch(function(error) {
+                console.log(error);
+              })
+          },
+          // 获取仓库列表
+          // getData() {
+          //   this.waiting = true
+          //   var _this = this
+          //   axios.post('http://192.168.1.155:8081/storeHdr/queryList', {
+          //       page: this.pagination.page,
+          //       pageSize: this.pagination.pageSize
+          //     })
+          //     .then(function(res) {
+          //       // console.log(res)
+          //       res = res.data
+          //       if (res.code == 0 && res.data) {
+          //         _this.total = res.data.total
+          //         _this.rawData = res.data.records
+          //       }
+          //       _this.waiting = false
+          //     })
+          //     .catch(function(error) {
+          //       console.log(error);
+          //     })
+          // },
+          // 新建仓库
+          // newWarehouse() {
+          //   this.dialogWaiting = true
+          //   var _this = this
+          //   axios.post('http://192.168.1.155:8081/storeHdr/save', {
+          //       storeName: this.currentFormItems.storeName,
+          //       storeNo: this.currentFormItems.storeNo,
+          //       storeLocation: this.currentFormItems.storeLocation,
+          //       description: this.currentFormItems.description
+          //     })
+          //     .then(function(res) {
+          //       _this.dialogWaiting = false
+          //       _this.dialogVisible1 = false
+          //       _this.currentRow = undefined
+          //       _this.getData()
+          //     })
+          //     .catch(function(error) {
+          //       console.log(error);
+          //     })
+          // },
+          // 编辑仓库
+          // editData() {
+          //   this.waiting = true
+          //   var _this = this
+          //   axios.post('http://192.168.1.155:8081/storeHdr/queryDetail', {
+          //       id: this.currentId
+          //     })
+          //     .then(function(res) {
+          //       // setTimeout(() => {
+          //       _this.waiting = false
+          //       // }, 500)
+          //       res = res.data
+          //       if (res.code == 0 && res.data) {
+          //         _this.formItems.forEach(p => {
+          //           p.value = res.data[p.name]
+          //         })
+          //       }
+          //     })
+          //     .catch(function(error) {
+          //       console.log(error);
+          //     });
+          // },
+          // updateData() {
+          //   this.dialogWaiting = true
+          //   var _this = this
+          //   console.log(this.currentFormItems.storeName)
+          //   console.log(this.currentFormItems.storeNo)
+          //   console.log(this.currentFormItems.storeLocation)
+          //   console.log(this.currentFormItems.description)
+          //   axios.post('http://192.168.1.155:8081/storeHdr/edit', {
+          //       id: this.currentId,
+          //       storeName: this.currentFormItems.storeName,
+          //       storeNo: this.currentFormItems.storeNo,
+          //       storeLocation: this.currentFormItems.storeLocation,
+          //       description: this.currentFormItems.description
+          //     })
+          //     .then(function(res) {
+          //       console.log('1');
+          //       _this.dialogWaiting = false
+          //       _this.dialogVisible2 = false
+          //       _this.currentRow = undefined
+          //       _this.getData()
+          //     })
+          //     .catch(function(error) {
+          //       console.log(error);
+          //     })
+          // },
+          // 确认操作
+          confirmData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlConfirmData, {
+                date: this.datevalue,
+                data: this.rawData,
+                kind: '原材料',
+              })
+              .then(function(res) {
+                _this.waiting = false
+                window.parent.vm.getDialog('dialog1').visible = !window.parent.vm.getDialog('dialog1').visible
+                window.parent.vm.getAllData()
+              })
+              .catch(function(error) {
+                console.log(error);
+              })
+          },
+          // 删除操作
+          delTab() {
+            this.items.forEach(p => {
+              this.rawData.splice(this.rawData.indexOf(p), 1)
+            })
+          },
+          warningAlert() {
+            this.$message({
+              message: '入库日期不能为空',
+              type: 'warning'
+            });
+          },
+          // 按钮点击事件
+          buttonsevent: function(args) {
+            switch (args.currentTarget.textContent) {
+              case '查询':
+                {
+                  this.searchData();
+                  // console.log("查询操作");
+                  break
+                }
+              case '确认':
+                {
+                  if (this.datevalue == '' || this.datevalue == null) {
+                    this.warningAlert()
+                  } else this.confirmData()
+                  break
+                }
+              case '删除':
+                {
+                  this.delTab()
+                  console.log('删除操作');
+                  break
+                }
+              default:
+                console.log("！未知错误！")
+                break
+            }
+          },
+          // 表格多选操作
+          selection(arg) {
+            if (arg.selectionchange.length != 0) {
+              this.items = []
+              this.selected = arg.selectionchange
+              this.selected.forEach(p => {
+                this.items.push(p)
+              })
+              // console.log(this.items);
+            } else this.selected = undefined
+          },
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>
