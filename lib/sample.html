@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Pragma" CONTENT="no-cache">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <title>Stimulsoft表单封装Demo</title>
+  <script id="polyfill" pre-src="../lib/polyfill.min.js"></script>
+  <script>
+    if (!!window.ActiveXObject || "ActiveXObject" in window) document.getElementById('polyfill').src = document.getElementById('polyfill').getAttribute('pre-src')
+  </script>
+  <script src="../lib/cool-sti.js"></script>
+  <script src="Demo.js"></script>
+  <script src="index.js"></script>
+  <style>
+    body {
+      line-height: 300%;
+    }
+
+    p {
+      line-height: 100%;
+    }
+
+    button {
+      line-height: 100%;
+      padding: 10px;
+    }
+
+    select {
+      width: 100px;
+      height: 37px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>cool-sti.js（兼容IE10+）
+        <a href="../lib.zip">下载库文件包</a>
+    </h1>
+  <p>
+    <a href="http://www.stimulsoft.com" target="_blank">Stimulsoft Reports</a>的简化封装，并用异步动态加载解决库文件加载慢的现象
+  </p>
+  <p>只需显式引用cool-sti.js，但必须完整解包并保持所有文件与cool-sti.js路径相对固定</p>
+  <p>外部库：</p>
+  <ul>
+    <li>
+      <a href="https://babeljs.io/docs/en/babel-polyfill" target="_blank">polyfill</a>：IE内核浏览器兼容库，火狐/谷歌等现代浏览器可不引用（按需引用可参考本页的head）
+    </li>
+    <li>
+      <a href="https://github.com/axios/axios" target="_blank">axios</a>：基于Promise的ajax库，使用ajax提交时动态加载
+    </li>
+    <li>
+      <a href="https://localforage.github.io/localForage/" target="_blank">localforage</a>：基于IndexedDB的本地存储库，打开新窗口时动态加载
+    </li>
+  </ul>
+  <p>&nbsp;</p>
+  <ul>
+    <h2>Changelog</h2>
+    <li>2018/8/6 - 将新窗口数据存储方式，从opener，更换为
+      <a href="https://localforage.github.io/localForage/" target="_blank">localForage</a>， 效果：主窗口关闭或刷新不影响预览窗口刷新
+    </li>
+    <li>2018/8/7 - 增加设计器后端保存功能</li>
+    <li>2018/8/8 - 重新封装，不再暴露内部方法</li>
+  </ul>
+  <p>&nbsp;</p>
+  <ul>
+    <h2>API</h2>
+    <span>window上添加coolSti对象, 成员：</span>
+    <li>方法（均为Promise异步）：</li>
+    <ul>
+      <li>print(report, template, data, variables): PDF格式打印报表
+        <br>
+        <button onclick="printClicked(this)">打印</button>
+        IE需安装PDF软件
+      </li>
+      <li>view(report, template, data, variables, onSaveReportName, pageTitle, isDirectEdit): 新窗口打开报表
+        <br>
+        <button onclick="viewClicked(this)">预览</button>
+        <button onclick="viewEditClicked(this)">预览并直接打开设计器</button>
+        此按钮同时演示后端保存:
+        <p style="margin-left: 4em;">若onSaveReportName包含“/”，使用此字符串作为绝对路径ajax post到后端保存</p>
+        <p style="margin-left: 4em;">提交参数： {report: e.report.reportAlias, template: e.report.reportName, json: e.report.saveToJsonString()}</p>
+        <p style="margin-left: 4em;">原有调用主窗口function仍有效，新功能优点是不依赖主窗口，关闭或刷新都不影响新窗口中的设计器保存</p>
+      </li>
+      <li>export(filename, format, report, template, data, variables): 导出报表
+        <br>
+        <button onclick="exportClicked(this)">导出</button>
+        <select>
+                    <option value="csv">Csv</option>
+                    <option value="xlsx">Excel2007</option>
+                    <option value="html">Html</option>
+                    <option value="html">Html5</option>
+                    <option value="html">HtmlDiv</option>
+                    <option value="html">HtmlSpan</option>
+                    <option value="html">HtmlTable</option>
+                    <option value="pdf">Pdf</option>
+                    <option value="docx" selected>Word2007</option>
+                </select>
+      </li>
+    </ul>
+    <li>属性：</li>
+    <ul>
+      <li>debug: 调试模式开关，输出计时</li>
+      <li>localforageSize: IndexedDB缓存表单数量，默认100，超过会清空再写入</li>
+    </ul>
+  </ul>
+</body>
+
+</html>
