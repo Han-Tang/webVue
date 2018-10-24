@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>报价单管理</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- <link rel="stylesheet" href="../css/index.css"> -->
+  <!-- 李梅css -->
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/button-group.js"></script>
+  <script src="../scripts/components/dialog-form.js"></script>
+  <script src="../scripts/components/new-or-edit.js"></script>
+  <script src="../scripts/FileSaver.js-master/FileSaver.js"></script>
+  <!-- <script src="menu.js"></script> -->
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+
+  <!-- 引入打印导出插件 -->
+  <script id="polyfill" pre-src="../lib/polyfill.min.js"></script>
+  <script>
+    if (!!window.ActiveXObject || "ActiveXObject" in window) document.getElementById('polyfill').src = document.getElementById('polyfill').getAttribute('pre-src')
+  </script>
+  <script src="../lib/cool-sti.js"></script>
+
+</head>
+<!-- #7A9973 -->
+
+<body>
+  <div id="root" style="height:100%">
+    <el-container style="height:100%;margin:0;position: absolute;width: 100%;border:1px solid #7A9973;">
+      <el-header height="auto">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top: 1px solid #7A9973;">
+          <!-- 侧边栏查询 -->
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <cool-query :origin-condition="originCondition" @get-condition="getCondition"></cool-query>
+          </el-aside>
+          <el-container style="height:100%">
+            <el-main style="height:100%">
+              <cool-table highlight-current-row="highlight-current-row" stripe="stripe" :page="true" @table-row-click="handleRowClick" :columns="Hdrcolumns" :total="total" :current-page.sync="condition.current" :data="HdrData" :page-sizes="[10, 20, 50, 100,200]"
+                :page-size.sync="condition.offset" @pagination-size-change="handleSizeChange" :layout="layout" @pagination-current-change="handlePageChange" border="border" v-loading="tableLoading" :cell-style="cellRow">
+              </cool-table>
+            </el-main>
+            <el-footer height="260px" ref="footer" style="border-top:1px solid #7A9973;">
+              <el-tabs type="border-card">
+                <el-tab-pane label="产品明细">
+                  <!-- 明细表 -->
+                  <cool-table :columns="Dtlcolumns" :data="DtlData" border="border" :cell-style="cellRow" height="225px"></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="历史状态">
+                  <!-- 历史状态 -->
+                  <cool-table :columns="historylist" :data="historyData" border="border" :cell-style="cellRow" height="225px"></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="订单附件">
+                  <cool-table ref="multipleTable" :upload-tool="true" :size="size" :url-upload-attachment="urlUploadAttachment" :headers="headers" :upload-data="uploadData" @uploadsuccess="uploadSuccess" :upbtn1="upbtn1" :upbtn2="upbtn2" :upbtn3="upbtn3"
+                    :upbtn4="upbtn4" @deluploaded="delUploaded" @downloadattachment="downloadAttachment" :columns="fileList" :data="updatedData" :cell-style="cellRow" table-style="border-bottom: solid #7A9973 1px;overflow:auto" border="border"
+                    height="192px" @table-selection-change="uploadedSelect"></cool-table>
+                </el-tab-pane>
+
+              </el-tabs>
+            </el-footer>
+          </el-container>
+        </el-container>
+      </el-main>
+      <el-dialog title="新建/编辑报价单" :visible.sync="dialogVisible" width="1000px" top="20px">
+        <new-or-edit :data="dialogData" @close-dialog="dialogVisible=false" @save-success="getHdrData" :form-items="formItems" :url="url" :current-data='currentRow' :new-edit-visible="newEditVisible" @newedit="newedit" @closenewedit="closenewedit"></new-or-edit>
+      </el-dialog>
+
+      <el-dialog title="退回操作" :visible.sync="backVisible" width="600px" @close="dialogclose">
+        <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+          <el-button size="mini" @click='handleBack'>提 交</el-button>
+          <el-button size="mini" @click="backVisible=false">返 回</el-button>
+        </el-button-group>
+
+        <dialog-form style="border:1px solid #7A9973;padding-top:20px;padding-left:5px" :form-items="backItems" size="mini" :inline="true" label-width="70px" @updateform='getCurrentForm'></dialog-form>
+      </el-dialog>
+    </el-container>
+  </div>
+</body>
+
+<script>
+  function onSaveReport(e) {
+    //此方法会被新窗口以.call(window, e)的方式调用，所以this是新窗口window对象
+    this.console.debug(e)
+    this.alert('自定义的保存表单——开发中')
+  }
+  var root = new Vue({
+    el: '#root',
+    data: {
+      //url合集
+      urlQuery: config + '/quotation/queryByPage',
+      urlGetList: config + '/quotation/dtlList',
+      urlSave: config + '/quotation/save',
+      urlUpdate: config + '/quotation/update',
+      urlDelete: config + '/quotation/delete',
+      urlExamine: config + '/quotation/examine',
+      urlgetOrderType: config + '/info/queryInfo',
+      urlGetStatus: config + '/quotation/status',
+      urlGetHistory: config + '/quotation/history',
+      urlGetBack: config + '/quotation/processReturn',
+      urlUploadAttachment: config + '/file/uploadFile',
+      urlGetUploadedData: config + '/file/list',
+      urlDelUploaded: config + '/file/delete',
+      urlDownload: config + '/file/downloadFile',
+      urlPrint: config + '/quotation/printing',
+
+      newEditVisible: false,
+      printData: [],
+      // 上传附件
+      headers: {
+        token: localStorage.token,
+        Authorization: localStorage.token,
+        AccessControlAllowCredentials: true
+      },
+      uploadData: {
+        fileType: 'file',
+        filePurpose: 'fileInfoQuotation',
+        fkPurposeId: ''
+      },
+      currentId: [],
+      upbtn1: true,
+      upbtn2: true,
+      upbtn3: true,
+      upbtn4: true,
+      currentAttachInfo: [],
+      //查询条件
+      condition: {
+        current: 1,
+        offset: 10
+      },
+      currentFormItems: [],
+      backVisible: false,
+      backItems: [{
+        type: 'input',
+        value: '',
+        label: '当前状态',
+        name: 'status',
+        style: {
+          width: '50%'
+        },
+        disabled: true
+      }, {
+        type: 'select',
+        value: '',
+        label: '退回状态',
+        name: 'newStatus',
+        options: [{
+          value: '新建订单',
+          label: '新建订单'
+        }, {
+          value: '已提交',
+          label: '已提交'
+        }, {
+          value: '已设计',
+          label: '已设计'
+        }, {
+          value: '已拆单',
+          label: '已拆单'
+        }, {
+          value: '客户确认',
+          label: '客户确认'
+        }],
+        style: {
+          width: '50%'
+        },
+        inputStyle: {
+          width: '167px'
+        }
+      }, {
+        type: 'input',
+        value: '',
+        label: '退回原因',
+        name: 'remark',
+        style: {
+          width: '100%'
+        },
+      }],
+      //组件prop
+      originCondition: {
+        formno: {
+          value: '',
+          name: '报价单编号',
+          fieldName: 'formno',
+          form: 'input'
+        },
+        customerName: {
+          value: '',
+          name: '客户名称',
+          fieldName: 'customerName',
+          form: 'input'
+        },
+        region: {
+          value: '',
+          name: '区域',
+          fieldName: 'region',
+          form: 'input'
+        },
+        salesman: {
+          value: '',
+          name: '业务员',
+          fieldName: 'salesman',
+          form: 'input'
+        },
+        status: {
+          value: '',
+          name: '订单状态',
+          fieldName: 'status',
+          form: 'select',
+          options: [],
+        },
+        deliveryDate: {
+          value: ['', ''],
+          name: '交货日期',
+          fieldName: 'deliveryDate',
+          form: 'date'
+        },
+        statusDate: {
+          value: ['', ''],
+          name: '创建日期',
+          fieldName: 'createDate',
+          form: 'date'
+        }
+      },
+      //主表数据
+      HdrData: [],
+      total: 0,
+      layout: 'total, sizes, prev, pager, next, jumper',
+      tableLoading: false,
+      historylist: [{
+        prop: 'statusCode',
+        label: '状态编号（前）',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'status',
+        label: '改变前状态',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'newStatusCode',
+        label: '状态编号（后）',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'newStatus',
+        label: '改变后状态',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'updateDate',
+        label: '改变日期',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'updateName',
+        label: '操作人',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'description',
+        label: '备注',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }],
+      Hdrcolumns: [{
+          prop: 'index',
+          fixed: 'fixed',
+          width: '50px'
+        },
+        {
+          prop: 'formno',
+          label: '报价单编号',
+          width: '160',
+          showOverflowTooltip: true,
+          fixed: 'fixed'
+        },
+        {
+          prop: 'orderType',
+          label: '订单类型'
+        },
+        {
+          prop: 'customerName',
+          label: '客户名称'
+        },
+        {
+          prop: 'customerCode',
+          label: '客户编码'
+        },
+        {
+          prop: 'region',
+          label: '区域'
+        },
+        {
+          prop: 'salesman',
+          label: '业务员'
+        },
+        {
+          prop: 'urgent',
+          label: '是否加急',
+          formatter: function(arg) {
+            return arg.urgent == true ? '是' : '否'
+          }
+        },
+        {
+          prop: 'orderedDate',
+          label: '订货日期'
+        },
+        {
+          prop: 'deliveryDate',
+          label: '交货日期'
+        },
+        {
+          prop: 'status',
+          label: '订单状态'
+        },
+        {
+          prop: 'statusDate',
+          label: '状态时间'
+        },
+        {
+          prop: 'amount',
+          label: '订单金额'
+        },
+        {
+          prop: 'discountSuggest',
+          label: '折扣说明',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'createDate',
+          label: '创建日期'
+        },
+        {
+          prop: 'createName',
+          label: '创建人'
+        }
+      ],
+      // header按钮
+      buttons: [{
+          text: '查找',
+          size: 'mini',
+          icon: 'el-icon-search',
+          disabled: false
+        },
+        {
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          disabled: false
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          disabled: false
+        },
+        {
+          text: '提交',
+          size: 'mini',
+          icon: 'el-icon-check',
+          disabled: false
+        },
+        {
+          text: '退回',
+          size: 'mini',
+          icon: 'el-icon-back',
+          disabled: false,
+        },
+        {
+          text: '打印',
+          size: 'mini',
+          icon: 'el-icon-document',
+          disabled: false
+        },
+        {
+          text: '导出',
+          size: 'mini',
+          icon: 'el-icon-message',
+          disabled: false
+        },
+        {
+          text: '统计',
+          size: 'mini',
+          icon: 'el-icon-more',
+          disabled: false
+        },
+      ],
+      //明细表数据
+      DtlData: [],
+      Dtlcolumns: [{
+          type: 'index'
+        },
+        {
+          prop: 'productName',
+          label: '产品名称',
+          showOverflowTooltip: true,
+          width: '180px'
+        },
+        {
+          prop: 'productCode',
+          label: '产品编码'
+        },
+        {
+          prop: 'mainColor',
+          label: '主花色'
+        },
+        {
+          prop: 'viceColor',
+          label: '副花色'
+        },
+        {
+          prop: 'mainMaterial',
+          label: '主材质'
+        },
+        {
+          prop: 'viceMaterial',
+          label: '副材质',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'qty',
+          label: '数量',
+          // align: 'right'
+        },
+        {
+          prop: 'price',
+          label: '单价'
+        },
+        {
+          prop: 'priceMethod',
+          label: '计价方式'
+        },
+        {
+          prop: 'amount',
+          label: '金额'
+        }
+      ],
+      //upload数据
+      // uploadlist: [],
+      fileList: [{
+          type: 'selection',
+          selectable: true
+        }, {
+          prop: 'name',
+          label: '附件名称'
+        },
+        {
+          prop: 'updateDate',
+          label: '上传日期'
+        },
+        {
+          prop: 'createName',
+          label: '操作人'
+        }
+      ],
+      size: 'mini',
+      //表格单元格样式
+      cellRow: {
+        height: '30px',
+        padding: '3px 0'
+      },
+      // 其他
+      currentRow: undefined,
+      dialogVisible: false,
+      historyData: [],
+      updatedData: [],
+      dialogData: undefined,
+      url: undefined,
+      //新建窗口cool-form部分props
+      formItems: [{
+          label: '订单类型',
+          value: '',
+          name: 'orderType',
+          type: 'select',
+          options: [],
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '客户名称',
+          value: '',
+          name: 'customerName',
+          type: 'autocomplete',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '客户编码',
+          value: '',
+          name: 'customerCode',
+          type: 'input',
+          disabled: true,
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '业务员',
+          value: '',
+          name: 'salesman',
+          type: 'input',
+          disabled: true,
+          style: {
+            width: '50%'
+          },
+          inputStyle: {
+            width: '120%'
+          }
+        },
+        {
+          label: '付款方式',
+          value: '',
+          name: 'payWay',
+          type: 'select',
+          style: {
+            width: '50%'
+          },
+          inputStyle: {
+            width: '120%'
+          },
+          options: []
+        },
+        {
+          label: '订货日期',
+          value: '',
+          name: 'orderedDate',
+          type: 'date',
+          format: 'yyyy-MM-dd',
+          valueFormat: 'yyyy-MM-dd HH:mm:ss',
+          style: {
+            width: '50%'
+          },
+          inputStyle: {
+            width: '120%'
+          }
+        },
+        {
+          label: '交货日期',
+          value: '',
+          name: 'deliveryDate',
+          type: 'date',
+          format: 'yyyy-MM-dd',
+          valueFormat: 'yyyy-MM-dd HH:mm:ss',
+          style: {
+            width: '50%'
+          },
+          inputStyle: {
+            width: '120%'
+          }
+        },
+        {
+          label: '是否加急',
+          value: false,
+          name: 'urgent',
+          type: 'radio',
+          radioItems: [{
+              value: true,
+              label: '是'
+            },
+            {
+              value: false,
+              label: '否'
+            }
+          ],
+          style: {
+            width: '50%'
+          },
+          inputStyle: {
+            width: '120%'
+          }
+        },
+        {
+          label: '提货方式',
+          value: '',
+          name: 'deliveryWay',
+          type: 'select',
+          style: {
+            width: '50%'
+          },
+          options: []
+        },
+        {
+          label: '备注',
+          value: '',
+          name: 'description',
+          type: 'input',
+          style: {
+            width: '60%'
+          },
+          inputStyle: {
+            width: '400px'
+          }
+        },
+      ]
+    },
+    mounted() {
+      //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+      initial()
+      //按钮可用/不可用控制，可用再考虑一下其他办法比如watch和computed
+      setInterval(() => {
+        this.buttons[2].disabled = this.currentRow === undefined ? true : false
+        this.buttons[3].disabled = this.currentRow === undefined ? true : false
+        this.buttons[4].disabled = this.currentRow === undefined ? true : false
+        this.buttons[5].disabled = this.currentRow === undefined ? true : false
+        this.buttons[6].disabled = this.currentRow === undefined ? true : false
+        this.upbtn1 = this.currentRow === undefined ? true : false
+        this.upbtn2 = this.$refs.multipleTable.uploadlist.length === 0 ? true : false
+        this.upbtn3 = this.currentId.length === 0 ? true : false
+        this.upbtn4 = this.currentId.length === 1 ? false : true
+      }, 100)
+      //加载完才可见，谨防出现为渲染的难看的样式
+      this.$el.style.visibility = 'visible'
+      //获取侧边栏部分options信息，formItems的options部分内容
+      axios.post(this.urlGetStatus, {
+        orderType: ""
+      }).then(resp => {
+        console.log(resp);
+        this.originCondition.status.options = resp.data.data
+      })
+    },
+    methods: {
+      // 新建编辑弹出框的显隐控制
+      newedit(arg) {
+        this.newEditVisible = arg
+      },
+      closenewedit(arg) {
+        this.newEditVisible = arg
+      },
+      printClicked() {
+        if (this.HdrData.length != 0) {
+          coolSti.view(
+            'SimpleList',
+            'Report',
+            this.printData, {
+              'Today': new Date()
+            },
+            'onSaveReport', //这里需要使用文本的方法名, 不传这个参数则不会有设计器按钮
+            '新建打印' //新窗口的名字
+          )
+        } else this.$message('无有效数据')
+      },
+      getPrintData() {
+        axios.post(this.urlPrint, {
+            formno: this.currentRow.formno
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.printData = res.data
+            }
+          })
+      },
+      dialogclose() {
+        this.currentRow = undefined
+      },
+      getCurrentForm(arg) {
+        for (var p in arg) {
+          if (arg[p] != undefined) {
+            this.currentFormItems[p] = arg[p]
+          } else this.currentFormItems[p] = ""
+        }
+      },
+      //获取侧边栏查询参数，同分页信息结合，变成总查询参数
+      getCondition(playload) {
+        for (var prop in this.condition) {
+          if (prop != 'current' && prop != 'offset') {
+            delete this.condition[prop]
+          }
+        }
+        this.condition = Object.assign(this.condition, playload)
+        this.condition.current = 1
+      },
+      //查询主表数据，
+      getHdrData() {
+        this.tableLoading = true
+        axios.post(this.urlQuery, this.condition)
+          .then(resp => {
+            switch (resp.data.code) {
+              //登录超时，重新登录
+              case 5000:
+                reLogin(this)
+                break
+                //请求成功
+              case 0:
+                this.HdrData = formatIndex(resp.data.data.records, this.condition.current, this.condition.offset)
+                this.total = resp.data.data.total
+                this.tableLoading = false
+                //查询出数据之后明细表清空，currentRow设为初始值undefined
+                this.DtlData = []
+                this.historyData = []
+                this.updatedData = []
+                this.currentRow = undefined
+                break
+              default:
+                defaultError(resp.data.msg, this, 'tableLoading')
+                break
+            }
+          })
+          // 因为是匿名函数，提出来写进公共方法的命名函数有问题，待考究
+          .catch((error => {
+            this.$message('服务器异常，请联系管理人员')
+            setTimeout(() => {
+              this.tableLoading = false
+            }, 500)
+          }))
+      },
+      //查询明细表数据
+      getDtlData(ev) {
+        axios.post(this.urlGetList, {
+            formno: ev.formno
+          })
+          .then(resp => {
+            switch (resp.data.code) {
+              case 5000:
+                reLogin(this)
+                break;
+              case 0:
+                this.DtlData = resp.data.data
+                break
+              default:
+                defaultError(resp.data.msg, this)
+                break;
+            }
+          }).catch((error => {
+            this.$message('服务器异常，请联系管理人员')
+            setTimeout(() => {
+              this.tableLoading = false
+            }, 500)
+          }))
+      },
+      // 获取附件列表
+      getUploadedData() {
+        axios.post(this.urlGetUploadedData, {
+            code: this.currentRow.formno,
+            purpose: "fileInfoQuotation"
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.updatedData = res.data
+            }
+          })
+      },
+      //主表行点击事件处理，编辑删除按钮可用，查询明细表
+      handleRowClick(arg) {
+        if (arg !== undefined) {
+          this.currentRow = arg
+          this.getDtlData(arg)
+          this.getHistory()
+          this.getUploadedData()
+          this.getPrintData()
+          this.uploadData.fkPurposeId = arg.formno
+        }
+      },
+      //按钮删除事件
+      delTab: function() {
+        if (confirm('确定要删除选定的记录')) {
+          var loading = setLoading(this)
+          axios
+            .post(this.urlDelete, {
+              formno: this.currentRow.formno
+            })
+            .then(resp => {
+              switch (resp.data.code) {
+                case 5000:
+                  reLogin(this)
+                  break;
+                case 0:
+                  setTimeout(() => {
+                    this.$message(resp.data.msg);
+                    loading.close()
+                  }, 500)
+                  this.getHdrData()
+                  break
+                default:
+                  defaultError(resp.data.msg, this, loading)
+                  break;
+              }
+            }).catch((error => {
+              setTimeout(() => {
+                this.$message.error('请求异常，请联系管理员');
+                loading.close()
+              }, 500)
+            }))
+        }
+      },
+      //提交
+      examine() {
+        var loading = setLoading(this)
+        axios.post(this.urlExamine, this.currentRow)
+          .then(resp => {
+            switch (resp.data.code) {
+              case 5000:
+                reLogin(this)
+                break;
+              case 0:
+                setTimeout(() => {
+                  this.$message(resp.data.msg);
+                  loading.close()
+                }, 500)
+                break;
+              default:
+                defaultError(resp.data.msg, this, loading)
+                break;
+            }
+          }).catch((error) => {
+            setTimeout(() => {
+              this.$message.error('请求异常，请联系管理员');
+              loading.close()
+            }, 500)
+          })
+      },
+      BackTab() {
+        var _this = this
+        axios.post(this.urlGetStatus, {
+            orderType: this.currentRow.orderType
+          })
+          .then(res => {
+            res = res.data
+            console.log(res.data);
+            _this.backItems[1].options = res.data
+          })
+        this.backVisible = true
+        this.backItems[0].value = this.currentRow.status
+      },
+      handleBack() {
+        var _this = this
+        axios.post(this.urlGetBack, {
+            formno: this.currentRow.formno,
+            status: this.currentFormItems.status,
+            newStatus: this.currentFormItems.newStatus,
+            remark: this.currentFormItems.remark
+          })
+          .then(res => {
+            _this.backVisible = false
+            _this.getHdrData()
+          })
+      },
+      //查询历史状态记录
+      getHistory() {
+        var _this = this
+        axios.post(this.urlGetHistory, {
+            formno: this.currentRow.formno
+          })
+          .then(res => {
+            res = res.data
+            _this.historyData = res.data
+          })
+      },
+      //按钮点击事件分类
+      buttonsevent: function(args) {
+        switch (args.currentTarget.textContent) {
+          case '查找':
+            {
+              this.getHdrData()
+              break
+            }
+          case '新建':
+            {
+              this.dialogData = []
+              //此处设置currentRow为undefined是因为，保存和更新需要传递的参数不一样，更新需要多传递ts和id属性，通过判断currentRow来进行添加是我能想到的比较简单的方法，可以再研究一下更优的处理方法
+              this.currentRow = undefined
+              this.url = this.urlSave
+              this.formItems.forEach(p => {
+                if (p.name != 'urgent') {
+                  p.value = ''
+                }
+              })
+              this.dialogVisible = true
+              break
+            }
+          case '编辑':
+            {
+              //如果有data属性，会报错无法转化为json格式
+              this.DtlData.forEach(p => {
+                delete p.data
+              })
+              this.dialogData = this.DtlData
+              this.url = this.urlUpdate
+              this.formItems.forEach(p => {
+                p.value = this.currentRow[p.name]
+              })
+              this.dialogVisible = true
+              break
+            }
+          case '删除':
+            {
+              this.delTab()
+              break
+            }
+          case '提交':
+            {
+              this.examine()
+              break
+            }
+          case '退回':
+            {
+              this.backItems.forEach(p => {
+                p.value = ""
+              })
+              this.BackTab()
+              break
+            }
+          case '打印':
+            {
+              this.printClicked()
+              break
+            }
+          default:
+            break
+        }
+      },
+      //分页变化事件，封装后好像不能直接getDtlData，要先给pagination赋值
+      handleSizeChange(arg) {
+        this.condition.current = 1
+        this.condition.offset = arg
+        this.getHdrData()
+      },
+      handlePageChange(arg) {
+        this.condition.current = arg
+        this.getHdrData()
+      },
+      //上传附件
+      uploadSuccess(response, file, fileList) {
+        this.uploadlist = fileList
+        // console.log(fileList);
+        // console.log(fileList.indexOf(file));
+        this.getUploadedData()
+        this.uploadlist.splice(this.uploadlist.indexOf(file), 1)
+      },
+      // 勾选事件
+      uploadedSelect(arg) {
+        this.currentId = []
+        if (arg.length != 0) {
+          this.currentAttachInfo = arg[0].name
+        }
+        arg.forEach(p => {
+          this.currentId.push(p.id)
+        })
+      },
+      delUploaded() {
+        var _this = this
+        axios.post(this.urlDelUploaded, {
+            ids: this.currentId
+          })
+          .then(res => {
+            var test = checkCode(res.data.code, res.data.msg, this);
+            if (test) {
+              res = res.data
+              _this.$message('删除附件成功!')
+              _this.currentId = []
+              _this.getUploadedData()
+            }
+          })
+      },
+      downloadAttachment() {
+        axios.post(this.urlDownload, {
+            id: this.currentId[0],
+          }, {
+            responseType: 'blob'
+          })
+          .then(res => {
+            console.log(res);
+            this.download(res.data)
+            // saveAs(res.data, this.currentAttachInfo);
+            //            let img = document.createElement('img')
+            //            img.src = window.URL.createObjectURL(res.data)
+            //            document.body.appendChild(img)
+            //             window.URL.revokeObjectURL(img.src)
+          })
+      },
+      download(data) {
+        if (!data) {
+          return
+        }
+        let url = window.URL.createObjectURL(new Blob([data]))
+        let link = document.createElement('a')
+        link.style.display = 'none'
+        link.href = url
+        link.setAttribute('download', this.currentAttachInfo)
+
+        document.body.appendChild(link)
+        link.click()
+        this.$refs.multipleTable.clearSelectionOuter();
+      }
+
+    }
+  })
+</script>

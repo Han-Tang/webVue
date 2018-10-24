@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>讯航ERP管理系统</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/cool-form.js"></script>
+  <script src="../menu.js"></script>
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+  <style>
+    .el-table td, .el-table th{
+    padding: 5px 0
+  }
+  </style>
+</head>
+
+<body>
+  <div id="root">
+    <el-container style="height:100%">
+      <el-header height="28px">
+        <el-row>
+          <el-col :span="16">
+            <!-- 顶部按钮和查询输入框 -->
+            <el-button-group v-if="buttons.length" ref="buttonGroup">
+              <el-button v-for="button in buttons" :type="button.type" :size="button.size" :icon="button.icon" :loading="button.loading" :disabled="button.disabled" @click="buttonsevent">{{button.text}}</el-button>
+            </el-button-group>
+          </el-col>
+          <el-col :span="8">
+            <el-input size="mini" v-model="queryName" placeholder="输入姓名以查询">
+              <el-button slot="append" icon="el-icon-search" type="primary" @click="getData"></el-button>
+            </el-input>
+          </el-col>
+        </el-row>
+      </el-header>
+      <el-container ref="container">
+        <!-- 查询侧边栏 -->
+        <el-aside width="220px" style="background-color:white;border:1px solid  #7A9973;border-right:0px">
+          <el-tree :data="depts" :props="defaultProps" @node-click="queryByDept" :default-expand-all="true"></el-tree>
+        </el-aside>
+        <el-container style="padding:0;border:1px solid  #7A9973" class="tablecontainer">
+          <!-- 主表 -->
+          <cool-table :columns="columns" :data="data" :page="true" border="border" highlight-current-row="highlight-current-row" :total="total" :page-size.sync="param.offset" current-page.sync="param.current" @table-selection-change="handleSelect"
+            stripe="stripe" :page-sizes="[10, 20, 50, 100,200]" @table-row-click="handleRowClick" v-loading="tableLoading" @pagination-size-change="handleSizeChange" @pagination-current-change='handlePageChange' :layout="layout">
+          </cool-table>
+        </el-container>
+      </el-container>
+      <!-- 新增页面对话框 -->
+      <el-dialog title="新增/编辑用户" :visible.sync="dialogVisible" width="600px">
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogVisible=false" size="mini">取 消</el-button>
+          <el-button @click="submit" size="mini">保 存</el-button>
+        </el-button-group>
+        <el-form :model="form" :rules="rules" ref="ruleForm" size="mini" style="border:1px solid #7A9973;padding-top:20px">
+          <el-form-item label="姓名" :label-width="formLabelWidth" prop="name">
+            <el-input v-model="form.name" class="editInput"></el-input>
+          </el-form-item>
+          <el-form-item label="用户名" :label-width="formLabelWidth" prop="username">
+            <el-input v-model="form.username" class="editInput"></el-input>
+          </el-form-item>
+          <el-form-item label="密码" :label-width="formLabelWidth" prop="password" v-if="method=='new'">
+            <el-input v-model="form.password" class="editInput"></el-input>
+          </el-form-item>
+          <el-form-item label="部门" :label-width="formLabelWidth" prop="deptName">
+            <el-input v-model="form.deptName" class="editInput" @click.native="deptVisible=true"></el-input>
+          </el-form-item>
+          <el-form-item label="邮箱" :label-width="formLabelWidth" prop="email">
+            <el-input v-model="form.email" class="editInput"></el-input>
+          </el-form-item>
+          <el-form-item label="状态" :label-width="formLabelWidth" prop="status">
+            <el-radio :label="1" v-model="form.status" style="padding-left:20px">正常</el-radio>
+            <el-radio :label="0" v-model="form.status">禁用</el-radio>
+          </el-form-item>
+          <el-form-item label="角色" :label-width="formLabelWidth" prop="role">
+            <el-checkbox-group v-model="form.roleIdList" style="padding-left:20px">
+              <el-checkbox v-for="item in roles" :label="item.id">{{item.roleName}}</el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
+        </el-form>
+      </el-dialog>
+      <!-- 点击部门时弹出树形控件进行选择的dialog -->
+      <el-dialog title="选择部门" :visible.sync="deptVisible" width="40%">
+        <el-tree :data="depts" :props="defaultProps" @node-click="handleNodeClick"></el-tree>
+      </el-dialog>
+    </el-container>
+  </div>
+</body>
+<script>
+  var root = new Vue({
+    el: '#root',
+    data: {
+      //url合集
+      urlQuery: config + '/user/list',
+      urlSave: config + '/user/save',
+      urlGetDept: config + '/dept/tree',
+      urlGetRole: config + '/role/getRoles',
+      urlDelete: config + '/user/remove',
+      urlBatchDelete: config + '/user/batchRemove',
+      urlGetInfo: config + '/user/info',
+      //头部buttons和input
+      queryName: '',
+      buttons: [{
+          text: '添加',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          type: 'success',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          type: 'danger',
+          disabled: true
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          type: 'primary',
+          disabled: true
+        }
+      ],
+      //cool-table数据
+      data: [],
+      layout: 'total, sizes, prev, pager, next, jumper',
+      total: 0,
+      cellHeight: {
+        height: '40px'
+      },
+      tableLoading: false,
+      columns: [{
+          type: 'selection'
+        },
+        {
+          label: '',
+          prop: 'index',
+          width: '50'
+        },
+        {
+          label: '姓名',
+          prop: 'name'
+        },
+        {
+          label: '用户名',
+          prop: 'username'
+        },
+        {
+          label: '邮箱',
+          prop: 'email'
+        },
+        {
+          label: '状态',
+          prop: 'status'
+        }
+      ],
+      ids: [],
+      selection: [],
+      currentRow: undefined,
+      //查询参数
+      param: {
+        current: 1,
+        offset: 10
+      },
+      //编辑页面不显示密码，通过判断method来判断是否显示密码
+      method: undefined,
+      //新增dialog和表格form
+      dialogVisible: false,
+      form: {
+        roleIdList: []
+      },
+      roleIdList: [],
+      roles: [],
+      formLabelWidth: '150px',
+      deptVisible: false,
+      rules: {
+        name: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入姓名'
+        }],
+        username: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入用户'
+        }],
+        password: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入密码'
+        }],
+        status: [{
+          required: true,
+          trigger: 'blur',
+          message: '请选择状态'
+        }],
+        deptName: [{
+          required: true,
+          trigger: 'blur',
+          message: '请选择部门'
+        }],
+        roleIdList: [{
+          required: true,
+          trigger: 'blur',
+          message: '请选择用户角色'
+        }],
+        email: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入邮箱'
+        }]
+      },
+      depts: [],
+      defaultProps: {
+        children: 'children',
+        label: 'text'
+      },
+    },
+    mounted() {
+      //初始化axios，设置为可见
+      initial()
+      this.$el.style.visibility = 'visible'
+      // 获取表格数据
+      this.getData()
+      //获取部门列表和角色列表
+      axios.post(this.urlGetDept).then(resp => {
+        this.depts.push(resp.data.data)
+      })
+      axios.post(this.urlGetRole).then(resp => {
+        this.roles = resp.data.data
+      })
+      //button状态控制
+      setInterval(() => {
+        this.buttons[1].disabled = this.selection.length === 0 ? true : false
+        this.buttons[2].disabled = this.currentRow === undefined || this.selection.length != 0 ? true : false
+      }, 100)
+    },
+    methods: {
+      //获取表格数据
+      getData() {
+        this.tableLoading = true
+        axios
+          .post(this.urlQuery, this.param)
+          .then(resp => {
+            var test = checkCode(resp.data.code, resp.data.msg, this, "tableLoading");
+            if (test) {
+              this.tableLoading = false;
+              this.data = formatIndex(resp.data.data.records, this.param.current, this.param.offset);
+              this.total = resp.data.data.total;
+            }
+          }).catch((error) => {
+            this.$message.error('请求异常，请联系管理员')
+            this.tableLoading = false
+          })
+      },
+      //新建按钮，清空form值
+      addClick() {
+        this.method = 'new'
+        this.form = {
+          roleIdList: []
+        }
+        this.dialogVisible = true
+      },
+      //编辑
+      editClick(arg) {
+        this.method = 'edit'
+        this.dialogVisible = true
+        this.form = Object.assign({}, arg)
+        this.form.roleIdList = this.roleIdList
+      },
+      //删除
+      deleteClick(index, row) {
+        axios.post(this.urlDelete, row.id).then(resp => {
+          this.getData()
+        })
+      },
+      //表格多选
+      handleSelect(selection) {
+        var that = this
+        if (selection.length != 0) {
+          this.selection = selection
+          this.ids = []
+          selection.forEach(p => {
+            that.ids.push(p.id)
+          })
+        } else this.selection = []
+      },
+      //选择部门树形节点点击事件
+      handleNodeClick(data) {
+        this.form.deptName = data.text
+        this.deptVisible = false
+        this.form.deptId = data.id
+      },
+      //表格行点击
+      handleRowClick(arg) {
+        this.currentRow = arg
+        axios.post(this.urlGetInfo, {
+          id: this.currentRow.id
+        }).then(resp => {
+          this.roleIdList = resp.data.data.roleIdList
+        })
+      },
+      //按左侧树查询，查询参数结构不变，给current大一点的值，应该可以涵盖完
+      queryByDept(data) {
+        this.tableLoading = true
+        this.param.deptId = data.id
+        axios.post(this.urlQuery, this.param).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, "tableLoading");
+          if (test) {
+            this.tableLoading = false;
+            this.data = resp.data.data.records;
+            this.total = resp.data.data.total;
+          }
+        }).catch((error) => {
+          this.$message.error('请求异常，请联系管理员')
+          this.tableLoading = false
+        })
+
+      },
+      //分页页码变化和当前页变化
+      handleSizeChange(arg) {
+        this.param.offset = arg
+        this.getData()
+      },
+      handlePageChange(arg) {
+        this.param.current = arg
+        this.getData()
+      },
+      //保存按钮点击事件
+      submit() {
+        var loading = setLoading(this)
+        axios.post(this.urlSave, this.form).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500);
+            this.dialogVisible = false;
+            this.getData();
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+
+      },
+      buttonsevent(args) {
+        switch (args.currentTarget.textContent) {
+          case '添加':
+            {
+              this.urlSave = config + '/user/save',
+              this.addClick()
+              break
+            }
+          case '删除':
+            {
+              if (confirm('确定要删除选定的记录')) {
+                var loading = setLoading(this)
+                axios.post(this.urlBatchDelete, this.ids).then(resp => {
+                  var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+                  if (test) {
+                    this.getData();
+                    setTimeout(() => {
+                      this.$message(resp.data.msg);
+                      loading.close()
+                    }, 500);
+                  }
+                }).catch((error) => {
+                  setTimeout(() => {
+                    this.$message.error('请求异常，请联系管理员');
+                    loading.close()
+                  }, 500)
+                })
+              }
+              break
+            }
+          case '编辑':
+            {
+              this.urlSave = config + '/user/update',
+              this.editClick(this.currentRow)
+              break
+            }
+        }
+      }
+    }
+  })
+</script>

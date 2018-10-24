@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>讯航ERP管理系统</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/cool-form.js"></script>
+  <script src="../menu.js"></script>
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+  <style>
+    .el-table td, .el-table th{
+    padding: 5px 0
+  }
+  </style>
+</head>
+
+<body>
+  <div id="root">
+    <el-container>
+      <el-header height="28px">
+        <el-row>
+          <el-col :span="16">
+            <el-button-group v-if="buttons.length" ref="buttonGroup">
+              <el-button v-for="button in buttons" :type="button.type" :size="button.size" :icon="button.icon" :loading="button.loading" :disabled="button.disabled" @click="buttonsevent">{{button.text}}</el-button>
+            </el-button-group>
+          </el-col>
+          <el-col :span="8">
+            <el-input size="mini" v-model="param.name" placeholder="输入姓名以查询">
+              <el-button slot="append" icon="el-icon-search" type="primary" @click="getData"></el-button>
+            </el-input>
+          </el-col>
+        </el-row>
+      </el-header>
+      <el-container ref="ccontainer">
+        <el-main>
+          <cool-table :v-loading="tableLoading" :layout="layout" :columns="columns" :cell-style="cellRow" :data="data" :page="true" border="border" @table-row-click="handleRowClick" highlight-current-row="highlight-current-row" :total="total"
+            :page-size.sync="param.offset" current-page.sync="param.current" @table-selection-change="handleSelect" stripe="stripe">
+          </cool-table>
+        </el-main>
+        <el-footer height="260px" ref="footer">
+          <el-tabs type="border-card">
+            <el-tab-pane label="银行账号">
+              <!-- 银行 -->
+              <cool-table :columns="Dtlcolumns" highlight-current-row="highlight-current-row" ref="bankTable" @table-row-click="handleDtlClick" :data="DtlData" :buttons="dtlButtons" @button-click="dtlButtonsevent" :button="true" :cell-style="cellRow"
+                border="border" stripe="stripe"></cool-table>
+            </el-tab-pane>
+
+            <el-tab-pane label="附件">
+              <el-upload class="upload-demo" ref="upload" :auto-upload="false" :action="urlUploadAttachment" :headers="headers" :data="uploadData" :show-file-list="true" :limit="1" :on-exceed="handleExceed" :file-list="uploadlist" @on-change="uploadChange"
+                style="padding:5px 0px 5px 5px">
+                <el-button slot="trigger" :size="size" type="primary" :disabled="selectUpdate">选取文件</el-button>
+                <el-button :disabled="uploadeddisabled" :size="size" type="success" @click="submitUpload" style="margin-left:3px">上传到服务器</el-button>
+                <el-button :size="size" type="danger" :disabled="deldisabled" @click="delUploaded" style="margin-left:0">删除</el-button>
+                <el-button :size="size" type="primary" :disabled="downloadButton" @click="downloadAttachment" style="margin-left:0">下载</el-button>
+              </el-upload>
+
+              <cool-table :columns="fileList" :data="updatedData" :cell-style="cellRow" table-style="border-bottom: solid #DCDFE6 1px;overflow:auto" border="border" @table-selection-change="uploadedSelect">
+              </cool-table>
+
+            </el-tab-pane>
+          </el-tabs>
+        </el-footer>
+      </el-container>
+      <el-dialog title="新增/编辑公司" :visible.sync="dialogVisible" width="600px">
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogVisible=false" size="mini">取 消</el-button>
+          <el-button @click="submit" size="mini">保 存</el-button>
+        </el-button-group>
+        <cool-form :form-items="formItems" @update-form="getCompany" label-width="120px" size="mini" style="border:1px solid #7A9973;padding-top:20px"></cool-form>
+      </el-dialog>
+      <el-dialog title="新建/编辑银行账户" :visible.sync="dialogBankVisible" width="800px" center>
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogBankVisible=false" size="mini">取 消</el-button>
+          <el-button @click="saveBankClick" size="mini">保 存</el-button>
+        </el-button-group>
+        <cool-form :form-items="dtlformItems" @update-form="getBank" :inline="true" label-width="120px" size="mini" style="border:1px solid #7A9973;padding-top:20px"></cool-form>
+      </el-dialog>
+    </el-container>
+  </div>
+</body>
+<script>
+  var root = new Vue({
+    el: '#root',
+    data: {
+      urlQuery: config + '/company/list',
+      urlSave: config + '/company/save',
+      urlDelete: config + '/company/remove',
+      urlGetBank: config + '/bankAccount/list',
+      urlBankSave: config + '/bankAccount/save',
+      urlBankDelete: config + '/bankAccount/delete',
+      urlUploadAttachment: config + '/file/uploadFile',
+      urlGetUploadedData: config + '/file/list',
+      urlDelUploaded: config + '/file/delete',
+      urlDownload: config + '/file/downloadFile',
+      // 上传附件
+      headers: {
+        token: localStorage.token,
+        Authorization: localStorage.token,
+        AccessControlAllowCredentials: true
+      },
+      uploadData: {
+        fileType: 'file',
+        filePurpose: 'fileInfoCompany',
+        fkPurposeId: ''
+      },
+      uploadeddisabled: true,
+      deldisabled: true,
+      selectUpdate: true,
+      downloadButton: true,
+      updatedData: [],
+      currentId: [],
+      //upload数据
+      size: 'mini',
+      uploadlist: [],
+      fileList: [{
+          type: 'selection',
+          selectable: true
+        }, {
+          prop: 'name',
+          label: '附件名称'
+        },
+        {
+          prop: 'updateDate',
+          label: '上传日期'
+        },
+        {
+          prop: 'createName',
+          label: '操作人'
+        }
+      ],
+
+      data: [],
+      param: {
+        current: 1,
+        offset: 10,
+        name: ''
+      },
+      currentRow: undefined,
+      dialogVisible: false,
+      cellHeight: {
+        height: '40px'
+      },
+      layout: 'total, sizes, prev, pager, next, jumper',
+      form: {},
+      selection: [],
+      tableLoading: false,
+      total: 0,
+      formLabelWidth: '150px',
+      company: undefined,
+      dtlCurrentRow: undefined,
+      dialogBankVisible: false,
+      bankAccount: undefined,
+      cellRow: {
+        height: '30px',
+        padding: "2px 0",
+        display: 'inlineBlock'
+      },
+      DtlData: [],
+      rules: {
+        name: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入姓名'
+        }],
+        userName: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入用户'
+        }],
+        password: [{
+          required: true,
+          trigger: 'blur',
+          message: '请输入密码'
+        }]
+      },
+      columns: [{
+          type: 'selection'
+        },
+        {
+          label: '',
+          prop: 'index',
+          width: '50'
+        },
+        {
+          label: '公司名称',
+          prop: 'name'
+        },
+        {
+          label: '公司类型',
+          prop: 'type'
+        },
+        {
+          label: '编码',
+          prop: 'code'
+        },
+        {
+          label: '简称',
+          prop: 'simpleName'
+        },
+        {
+          label: '所属行业',
+          prop: 'industry'
+        },
+        {
+          label: '公司法人',
+          prop: 'manager'
+        },
+        {
+          label: '排序',
+          prop: 'orderNum'
+        },
+        {
+          label: '状态',
+          prop: 'status'
+        }
+      ],
+      Dtlcolumns: [{
+          type: 'index'
+        },
+        {
+          label: '开户银行',
+          prop: 'bank'
+        },
+        {
+          label: '开户账号',
+          prop: 'account'
+        },
+        {
+          label: '收款账号名称',
+          prop: 'collectionAccount'
+        },
+        {
+          label: '账户余额',
+          prop: 'balance'
+        },
+        {
+          label: '分行信息',
+          prop: 'branch'
+        },
+        {
+          label: '开户名称',
+          prop: 'accountName'
+        },
+        {
+          label: '创建时间',
+          prop: 'createDate'
+        },
+        {
+          label: '创建人',
+          prop: 'createBy'
+        },
+        {
+          label: '修改时间',
+          prop: 'updateDate'
+        },
+        {
+          label: '修改人',
+          prop: 'updateBy'
+        },
+        {
+          label: '税号',
+          prop: 'tax'
+        },
+      ],
+      buttons: [{
+          text: '添加',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          type: 'success',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          type: 'danger',
+          disabled: true
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          type: 'primary',
+          disabled: true
+        }
+      ],
+      dtlButtons: [{
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          disabled: false
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          disabled: false
+        },
+        // {
+        //   text: '取消',
+        //   size: 'mini',
+        //   icon: 'el-icon-close',
+        //   disabled: false
+        // }
+      ],
+      formItems: [{
+          label: '公司名称',
+          value: '',
+          name: 'name',
+          type: 'input'
+        },
+        {
+          label: '公司类型',
+          value: '',
+          name: 'type',
+          type: 'input'
+        },
+        {
+          label: '编码',
+          value: '',
+          name: 'code',
+          type: 'input'
+        },
+        {
+          label: '简称',
+          value: '',
+          name: 'simpleName',
+          type: 'input'
+        },
+        {
+          label: '所属行业',
+          value: '',
+          name: 'industry',
+          type: 'input'
+        },
+        {
+          label: '公司法人',
+          value: '',
+          name: 'manager',
+          type: 'input'
+        }
+      ],
+      dtlformItems: [{
+          type: 'input',
+          value: '',
+          label: '公司编码',
+          name: 'code',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '开户银行',
+          name: 'bank',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '开户账号',
+          name: 'account',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '收款账号',
+          name: 'collectionAccount',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '账户余额',
+          name: 'balance',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '分行信息',
+          name: 'branch',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '开户名称',
+          name: 'accountName',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '税号',
+          name: 'tax',
+          style: 'width:50%'
+        },
+        // { type: 'input', value: '', label: '创建人', name: 'address', style: 'width:100%', inputStyle: { width: '400px' } },
+        // { type: 'input', value: '', label: '邮箱地址', name: 'email', style: 'width:100%', inputStyle: { width: '400px' } },
+      ],
+    },
+    mounted() {
+      initial()
+      this.$el.style.visibility = 'visible'
+      this.getData()
+      setInterval(() => {
+        this.buttons[2].disabled = this.currentRow === undefined || this.selection.length != 0 ? true : false
+        this.buttons[1].disabled = this.selection.length == 0 ? true : false
+        this.dtlButtons[0].disabled = this.currentRow === undefined ? true : false
+        this.dtlButtons[1].disabled = this.dtlCurrentRow === undefined ? true : false
+        this.dtlButtons[2].disabled = this.dtlCurrentRow === undefined ? true : false
+        //附件
+        this.selectUpdate = this.currentRow === undefined ? true : false
+        this.uploadeddisabled = this.currentRow === undefined ? true : false
+        this.deldisabled = this.currentId.length === 0 ? true : false
+        this.downloadButton = this.currentId.length === 1 ? false : true
+      }, 100)
+    },
+    methods: {
+      getData() {
+        this.tableLoading = true
+        axios.post(this.urlQuery, this.param).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, 'tableLoading');
+          if (test) {
+            this.tableLoading = false;
+            this.data = formatIndex(resp.data.data.records, this.param.current, this.param.offset);
+            this.total = resp.data.data.total;
+            this.currentRow = undefined;
+            this.DtlData = [];
+          }
+        }).catch((error) => {
+          this.$message.error('请求异常，请联系管理员')
+          this.tableLoading = false
+        })
+      },
+      getCompany(arg) {
+        this.company = arg
+      },
+      getBank(arg) {
+        this.bankAccount = arg
+      },
+      submit() {
+        if (this.currentRow) {
+          this.company.id = this.currentRow.id
+          this.company.ts = this.currentRow.ts
+        }
+        var loading = setLoading(this)
+        axios.post(this.urlSave, this.company).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            this.dialogVisible = false;
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500);
+            this.getData();
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+      },
+      handleRowClick(arg) {
+        this.dtlCurrentRow = undefined
+        this.currentRow = arg
+        this.dtlformItems[0].value = this.currentRow.code
+        this.getBankList()
+        this.uploadData.fkPurposeId = arg.code
+        this.getUploadedData(arg)
+      },
+      getBankList() {
+        axios.post(this.urlGetBank, {
+          code: this.currentRow.code
+        }).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, 'tableLoading');
+          if (test) {
+            this.DtlData = resp.data.data;
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+      },
+      handleSelect(arg) {
+        this.selection = arg
+      },
+      handleDtlClick(arg) {
+        this.dtlCurrentRow = arg
+      },
+      saveBankClick() {
+        if (this.dtlCurrentRow != undefined) {
+          this.bankAccount.id = this.dtlCurrentRow.id
+          this.bankAccount.ts = this.dtlCurrentRow.ts
+        }
+        var loading = setLoading(this)
+        axios.post(this.urlBankSave, this.bankAccount).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500)
+            this.dialogBankVisible = false
+            axios.post(this.urlGetBank, {
+              code: this.currentRow.code
+            }).then(resp => {
+              var test1 = checkCode(resp.data.code, resp.data.msg, this, loading);
+              if (test1) {
+                this.DtlData = resp.data.data;
+                this.$refs.bankTable.setCurrentRow(this.dtlCurrentRow);
+              }
+
+            })
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+      },
+      buttonsevent(args) {
+        switch (args.currentTarget.textContent) {
+          case '添加':
+            {
+              this.urlSave = config + '/company/save'
+              this.formItems.forEach(p => {
+                p.value = ''
+              })
+              this.dialogVisible = true
+              this.currentRow = undefined
+              break
+            }
+          case '删除':
+            {
+              if (confirm('确定要删除选定的记录')) {
+                var arr = []
+                this.selection.forEach(p => {
+                  arr.push(p.id)
+                })
+                //                delTab(this.urlDelete, arr, this.getData())
+                var loading = setLoading(this)
+                axios.post(this.urlDelete, arr).then(resp => {
+                  var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+                  if (test) {
+                    setTimeout(() => {
+                      this.$message(resp.data.msg);
+                      loading.close()
+                    }, 500)
+                    this.getData()
+                  }
+                }).catch((error) => {
+                  setTimeout(() => {
+                    this.$message.error('请求异常，请联系管理员');
+                    loading.close()
+                  }, 500)
+                })
+              }
+              break
+            }
+          case '编辑':
+            {
+              this.urlSave = config + '/company/update'
+              this.formItems.forEach(p => {
+                p.value = this.currentRow[p.name]
+              })
+              this.dialogVisible = true
+              break
+            }
+        }
+      },
+      dtlButtonsevent(args) {
+        switch (args.currentTarget.textContent) {
+          case '新建':
+            {
+              this.dtlCurrentRow = undefined
+              this.dtlformItems.forEach(p => {
+                if (p.name != 'code') {
+                  p.value = ''
+                }
+              })
+              this.urlBankSave = config + '/bankAccount/save'
+              this.dialogBankVisible = true
+              break
+            }
+          case '编辑':
+            {
+              this.urlBankSave = config + '/bankAccount/update'
+              this.dtlformItems.forEach(p => {
+                p.value = this.dtlCurrentRow[p.name]
+              })
+              this.dialogBankVisible = true
+            }
+            break
+          case '删除':
+            {
+              delTab(this.urlBankDelete, {
+                id: this.dtlCurrentRow.id,
+                ts: this.dtlCurrentRow.ts
+              }, this, this.getBankList)
+            }
+        }
+      },
+
+
+      //上传附件
+      beforeUpload(file) {
+        file.name = this.fileName != '' ? this.fileName : file.name
+      },
+      submitUpload() {
+        this.$refs.upload.submit();
+        this.getUploadedData()
+      },
+      // 获取附件列表
+      getUploadedData() {
+        // console.log(ev.formno);
+        axios.post(this.urlGetUploadedData, {
+            code: this.currentRow.code,
+            purpose: "fileInfoCompany"
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.updatedData = res.data
+            }
+          })
+      },
+      // 上传个数限制
+      handleExceed(files, fileList) {
+        this.$message.warning(`当前限制选择 1 个文件，本次已选择了 ${files.length} 个文件，如有多个文件请依次上传`);
+        // 共选择了 ${files.length + fileList.length} 个文件
+      },
+      uploadChange(arg) {
+        console.log('1');
+      },
+      // 勾选事件
+      uploadedSelect(arg) {
+        this.currentId = []
+        if (arg.length != 0) {
+          this.currentAttachInfo = arg[0].name
+        }
+        arg.forEach(p => {
+          this.currentId.push(p.id)
+        })
+      },
+      delUploaded() {
+        axios.post(this.urlDelUploaded, {
+            ids: this.currentId
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.$message('删除附件成功!')
+              this.currentId = undefined
+              this.getUploadedData()
+            }
+          })
+      },
+      downloadAttachment() {
+        axios.post(this.urlDownload, {
+            id: this.currentId[0],
+          }, {
+            responseType: 'blob'
+          })
+          .then(res => {
+            this.download(res.data)
+          })
+      },
+      download(data) {
+        if (!data) {
+          return
+        }
+        let url = window.URL.createObjectURL(new Blob([data]))
+        let link = document.createElement('a')
+        link.style.display = 'none'
+        link.href = url
+        link.setAttribute('download', this.currentAttachInfo)
+
+        document.body.appendChild(link)
+        link.click()
+      }
+
+    }
+  })
+</script>

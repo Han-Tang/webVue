@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>订单管理</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- <link rel="stylesheet" href="../css/index.css"> -->
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-form.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/button-group.js"></script>
+  <script src="../scripts/components/dialog-form.js"></script>
+  <script src="../scripts/components/new-or-edit.js"></script>
+  <script src="../scripts/components/tree-grid.js"></script>
+  <!-- <script src="menu.js"></script> -->
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+
+  <!-- 引入打印导出插件 -->
+  <script id="polyfill" pre-src="../lib/polyfill.min.js"></script>
+  <script>
+    if (!!window.ActiveXObject || "ActiveXObject" in window) document.getElementById('polyfill').src = document.getElementById('polyfill').getAttribute('pre-src')
+  </script>
+  <script src="../lib/cool-sti.js"></script>
+</head>
+
+<body>
+  <div id="root">
+    <el-container style="height:100%;margin:0;position: absolute;width: 100%;border:1px solid #7A9973;">
+      <el-header height="auto">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top: 1px solid #7A9973;">
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <cool-query :origin-condition="originCondition" @get-condition="getCondition"></cool-query>
+          </el-aside>
+          <el-container style="height:100%">
+            <el-main style="height:100%">
+              <cool-table stripe="stripe" highlight-current-row="highlight-current-row" :v-loading="tableLoading" :page-sizes="[10, 20, 50, 100,200]" :cell-style="cellRow" @table-row-click="handleRowClick" :columns="Hdrcolumns" :total="total"
+                :current-page.sync="condition.current" :data="HdrData" :page-size.sync="condition.offset" @pagination-size-change="handleSizeChange" @pagination-current-change="handlePageChange" :layout="layout" border="border" :page="true">
+              </cool-table>
+            </el-main>
+            <el-footer height="260px" ref="footer" style="border-top:1px solid #7A9973;">
+              <!-- <cool-table :columns="Dtlcolumns" :cell-style="cellRow" :data="DtlData" class="dtlTable"  pagination-style="display:none" border="border"></cool-table> -->
+              <el-tabs type="border-card">
+                <el-tab-pane label="产品明细">
+                  <cool-table :columns="Dtlcolumns" :data="DtlData" border="border" :cell-style="cellRow" height="225px" highlight-current-row="highlight-current-row" stripe></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="历史状态">
+                  <!-- 明细表 -->
+                  <cool-table :columns="historylist" :data="historyData" border="border" :cell-style="cellRow" height="225px"></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="订单收款">
+                  <cool-table :columns="receiveColumns" :data="ReceiptData" :buttons="dtlButtons" @button-click="dtlButtonsevent" :button="true" border="border" :cell-style="cellRow" height="225px" highlight-current-row="highlight-current-row"
+                    stripe @table-row-click="dltRowClick"></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="附件">
+                  <cool-table ref="multipleTable" :upload-tool="true" :size="size" :url-upload-attachment="urlUploadAttachment" :headers="headers" :upload-data="uploadData" :upbtn1="upbtn1" :upbtn2="upbtn2" :upbtn3="upbtn3" :upbtn4="upbtn4"
+                    @deluploaded="delUploaded" @downloadattachment="downloadAttachment" :columns="fileList" :data="updatedData" :cell-style="cellRow" table-style="border-bottom: solid #7A9973 1px;overflow:auto" border="border" height="192px"
+                    @table-selection-change="uploadedSelect"></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="BOM明细">
+
+                  <el-upload class="upload-demo" ref="upload" multiple :auto-upload="false" :action="urlBom" :headers="headers" :data="bomUploadData" :show-file-list="true" :limit="5" :on-exceed="handleExceed" :on-change="onChange" :on-remove="onRemove"
+                    :file-list="uploadlist" style="padding:5px 0px 5px 5px">
+                    <el-button slot="trigger" :size="size" type="primary" :disabled="bombtn1">选取文件</el-button>
+                    <el-button :disabled="bombtn2" :size="size" type="success" style="margin-left:3px" @click="submitUpload">上传到服务器</el-button>
+                    <el-button :size="size" type="danger" :disabled="upbtn3" @click="delUploaded" style="margin-left:0">删除</el-button>
+                  </el-upload>
+
+                  <tree-grid :columns="bomList" :tree-structure="true" :data-source="bomData">
+                  </tree-grid>
+
+                </el-tab-pane>
+
+              </el-tabs>
+            </el-footer>
+          </el-container>
+        </el-container>
+      </el-main>
+    </el-container>
+
+    <el-dialog title="退回操作" :visible.sync="backVisible" width="600px">
+      <!-- @close="dialogclose" -->
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button size="mini" @click='handleBack'>提 交</el-button>
+        <el-button size="mini" @click="backVisible=false">返 回</el-button>
+      </el-button-group>
+
+      <dialog-form style="border:1px solid #7A9973;padding-top:20px;padding-left:5px" :form-items="backItems" size="mini" :inline="true" label-width="70px" @updateform='getCurrentForm'></dialog-form>
+    </el-dialog>
+
+    <!-- 新建订单收款弹窗，考虑是否需要用coool-form控件 -->
+    <el-dialog title="新建订单收款" :visible.sync="dialogReceiptVisible" width="1000px" center>
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button @click="saveContactClick" size="mini">保 存</el-button>
+        <el-button @click="dialogReceiptVisible=false" size="mini">取 消</el-button>
+      </el-button-group>
+      <cool-form :form-items="dtlformItems" :inline="true" label-width="100px" size="mini" style="border:1px solid #7A9973;padding-top:20px" @update-form="getFormContact" v-loading="dialogLoading"></cool-form>
+    </el-dialog>
+
+    <el-dialog title="编辑订单收款" :visible.sync="dialogReceiptVisible2" width="1000px" center>
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button @click="updateContactClick" size="mini">保 存</el-button>
+        <el-button @click="dialogReceiptVisible2=false" size="mini">取 消</el-button>
+      </el-button-group>
+      <cool-form :form-items="dtlformItems" :inline="true" label-width="100px" size="mini" style="border:1px solid #7A9973;padding-top:20px" @update-form="getFormContact" v-loading="dialogLoading"></cool-form>
+    </el-dialog>
+  </div>
+</body>
+<script>
+  function onSaveReport(e) {
+    //此方法会被新窗口以.call(window, e)的方式调用，所以this是新窗口window对象
+    this.console.debug(e)
+    this.alert('自定义的保存表单——开发中')
+  }
+  var root = new Vue({
+    el: '#root',
+    data: {
+      //url合集
+      urlQuery: config + '/order/queryByPage',
+      urlGetList: config + '/order/dtlList', //订单明细
+      urlGetReceipt: config + '/order/receipts', //订单收款
+      urlSave: config + '/order/save',
+      urlDelete: config + '/order/delete',
+      urlgetOrderType: config + '/info/queryInfo',
+      urlGetQuotationStatus: config + '/order/status',
+      urlGetOrderStatus: config + '/order/status',
+      urlGetHistory: config + '/order/history',
+      urlGetBack: config + '/order/processReturn',
+      urlSaveReceipt: config + '/order/receiptSave', //新增订单收款
+      urlGetNewReceipt: config + '/bankAccount/list', //获取新增订单收款账号编号
+      urlGetPayType: config + '/info/queryInfo', //收款类型
+      urlUpdateReceipt: config + '/order/receiptUpdate', //编辑订单收款
+      urlDeleteReceipt: config + '/order/receiptDelete', //删除订单收款
+      urlUploadAttachment: config + '/file/uploadFile', //附件上传
+      urlBom: config + '/infoProduct/importBom',
+      urlBomList: config + '/infoProduct/bomList',
+      urlGetUploadedData: config + '/file/list',
+      urlDelUploaded: config + '/file/delete',
+      urlDownload: config + '/file/downloadFile',
+      urlPrint: config + '/order/printing',
+
+      printData: [],
+      // 上传Bom
+      bombtn1: true,
+      bombtn2: true,
+      bomData: [],
+      bomList: [{
+          text: '产品名称',
+          dataIndex: 'des'
+        },
+        {
+          text: '产品编码',
+          dataIndex: 'ref'
+        }, {
+          text: '长',
+          dataIndex: 'partOL'
+        }, {
+          text: '宽',
+          dataIndex: 'partOW'
+        }, {
+          text: '高',
+          dataIndex: 'partOT'
+        },
+        // {
+        //   text: '主花色',
+        //   dataIndex: ''
+        // }, {
+        //   text: '主材质',
+        //   dataIndex: ''
+        // },
+        {
+          text: '刨料长',
+          dataIndex: 'partL'
+        }, {
+          text: '刨料宽',
+          dataIndex: 'partW'
+        }, {
+          text: '刨料厚',
+          dataIndex: 'partT'
+        },
+      ],
+      bomUploadData: {
+        orderNum: ''
+      },
+      // 上传附件
+      headers: {
+        token: localStorage.token,
+        Authorization: localStorage.token,
+        AccessControlAllowCredentials: true
+      },
+      uploadData: {
+        fileType: 'file',
+        filePurpose: 'fileInfoOrder',
+        fkPurposeId: ''
+      },
+      uploadeddisabled: true,
+      deldisabled: true,
+      selectUpdate: true,
+      downloadButton: true,
+      updatedData: [],
+      currentId: [],
+      //upload数据
+      upbtn1: true,
+      upbtn2: true,
+      upbtn3: true,
+      upbtn4: true,
+      size: 'mini',
+      uploadlist: [],
+      fileList: [{
+          type: 'selection',
+          selectable: true
+        }, {
+          prop: 'name',
+          label: '附件名称'
+        },
+        {
+          prop: 'updateDate',
+          label: '上传日期'
+        },
+        {
+          prop: 'createName',
+          label: '操作人'
+        }
+      ],
+
+      currentFormItems: [],
+      backVisible: false,
+      backItems: [{
+        type: 'input',
+        value: '',
+        label: '当前状态',
+        name: 'status',
+        style: {
+          width: '50%'
+        },
+        disabled: true
+      }, {
+        type: 'select',
+        value: '',
+        label: '退回状态',
+        name: 'newStatus',
+        options: [],
+        style: {
+          width: '50%'
+        },
+        inputStyle: {
+          width: '167px'
+        }
+      }, {
+        type: 'input',
+        value: '',
+        label: '退回原因',
+        name: 'remark',
+        style: {
+          width: '100%'
+        },
+      }],
+      // 历史记录
+      historyData: [],
+      historylist: [{
+        prop: 'statusCode',
+        label: '状态编号（前）',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'status',
+        label: '改变前状态',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'newStatusCode',
+        label: '状态编号（后）',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'newStatus',
+        label: '改变后状态',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'updateDate',
+        label: '改变日期',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'updateName',
+        label: '操作人',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }, {
+        prop: 'description',
+        label: '备注',
+        // width: '100',
+        showOverflowTooltip: true,
+        // fixed: 'fixed'
+      }],
+      //主表数据
+      HdrData: [],
+      currentRow: undefined,
+      tableLoading: false,
+      total: 0,
+      layout: 'total, sizes, prev, pager, next, jumper',
+      Hdrcolumns: [{
+          prop: 'index',
+          fixed: 'fixed',
+          width: '50px'
+        },
+        {
+          prop: 'formno',
+          label: '订单编号',
+          width: '160',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'pFormno',
+          label: '报价单编号',
+          width: '160'
+        },
+        {
+          prop: 'orderType',
+          label: '订单类型'
+        },
+        {
+          prop: 'customerName',
+          label: '客户名称'
+        },
+        {
+          prop: 'customerCode',
+          label: '客户编号'
+        },
+        {
+          prop: 'region',
+          label: '区域'
+        },
+        {
+          prop: 'salesman',
+          label: '业务员'
+        },
+        {
+          prop: 'urgent',
+          label: '是否加急',
+          formatter: function(arg) {
+            return arg.urgent == true ? '是' : '否'
+          }
+        },
+        {
+          prop: 'orderedDate',
+          label: '订货日期'
+        },
+        {
+          prop: 'deliveryDate',
+          label: '交货日期'
+        },
+        {
+          prop: 'status',
+          label: '订单状态'
+        },
+        {
+          prop: 'amount',
+          label: '订单金额'
+        },
+        {
+          prop: 'discountSuggest',
+          label: '折扣说明'
+        },
+        // { prop: 'discountSuggest', label: '已收款金额',showOverflowTooltip:true },
+        {
+          prop: 'description',
+          label: '备注'
+        },
+        {
+          prop: 'createDate',
+          label: '创建日期'
+        },
+        {
+          prop: 'createName',
+          label: '创建人'
+        }
+      ],
+      //明细表数据
+      DtlData: [],
+      Dtlcolumns: [{
+          type: 'index',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'formno',
+          label: '订单编号',
+          width: '160',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'productName',
+          label: '产品名称'
+        },
+        {
+          prop: 'productCode',
+          label: '产品编码'
+        },
+        {
+          prop: 'mainColor',
+          label: '主花色'
+        },
+        {
+          prop: 'viceColor',
+          label: '副花色'
+        },
+        {
+          prop: 'mainMaterial',
+          label: '主材质'
+        },
+        {
+          prop: 'accessoryMaterial',
+          label: '副材质'
+        },
+        {
+          prop: 'qty',
+          label: '数量'
+        },
+        {
+          prop: 'price',
+          label: '单价'
+        },
+        {
+          prop: 'priceMethod',
+          label: '计价方式'
+        },
+        {
+          prop: 'amount',
+          label: '金额'
+        }
+      ],
+      // 订单收款
+      dtlCurrentRow: undefined,
+      dialogReceiptVisible: false,
+      dialogReceiptVisible2: false,
+      dtlformItems: [{
+        type: 'input',
+        value: '',
+        label: '订单编号',
+        name: 'formno',
+        style: {
+          width: '33.3%'
+        },
+        disabled: true
+      }, {
+        type: 'select',
+        value: '',
+        label: '收款账号编号',
+        name: 'receiptNumber',
+        options: [],
+        style: {
+          width: '33.3%'
+        },
+        inputStyle: {
+          width: '180px'
+        }
+      }, {
+        type: 'input',
+        value: '',
+        label: '收款账号名称',
+        name: 'receiptAccount',
+        style: {
+          width: '33.3%'
+        },
+        disabled: true
+      }, {
+        type: 'input',
+        value: '',
+        label: '收款金额',
+        name: 'amount',
+        style: {
+          width: '33.3%'
+        },
+      }, {
+        type: 'date',
+        value: '',
+        label: '收款时间',
+        name: 'receiptDate',
+        style: {
+          width: '33.3%'
+        },
+        inputStyle: {
+          width: '180px'
+        }
+      }, {
+        type: 'select',
+        value: '',
+        label: '收款类型',
+        name: 'receiptType',
+        options: [],
+        style: {
+          width: '33.3%'
+        },
+        inputStyle: {
+          width: '167px'
+        }
+      }, {
+        type: 'input',
+        value: '',
+        label: '公司名称',
+        name: 'name',
+        style: {
+          width: '33.3%'
+        },
+        disabled: true
+      }, {
+        type: 'input',
+        value: '',
+        label: '支付银行',
+        name: 'payBank',
+        style: {
+          width: '33.3%'
+        },
+        inputStyle: {
+          width: '180px'
+        }
+      }, {
+        type: 'input',
+        value: '',
+        label: '支付账号',
+        name: 'payAccount',
+        style: {
+          width: '33.3%'
+        },
+      }, {
+        type: 'input',
+        value: '',
+        label: '确认收款人',
+        name: 'receiptor',
+        disabled: true,
+        style: {
+          width: '33.3%'
+        }
+      }, {
+        type: 'input',
+        value: '',
+        label: '备注',
+        name: 'description',
+        style: {
+          width: '33.3%'
+        },
+        inputStyle: {
+          width: '180px'
+        }
+      }],
+      //订单收款数据
+      ReceiptData: [],
+      receiveColumns: [{
+          type: 'index',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'formno',
+          label: '订单编号',
+          width: '160',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'receiptNumber',
+          label: '收款账单编号'
+        },
+        {
+          prop: 'receiptAccount',
+          label: '收款账号名称'
+        },
+        {
+          prop: 'amount',
+          label: '收款金额'
+        },
+        {
+          prop: 'receiptor',
+          label: '确认收款人'
+        },
+        {
+          prop: 'receiptDate',
+          label: '收款时间'
+        },
+        {
+          prop: 'receiptType',
+          label: '收款类型'
+        },
+        {
+          prop: 'receiptVoucher',
+          label: '收款凭证'
+        },
+        {
+          prop: 'payBank',
+          label: '支付银行'
+        },
+        {
+          prop: 'payAccount',
+          label: '支付账号'
+        },
+        {
+          prop: 'createName',
+          label: '创建人'
+        },
+        {
+          prop: 'createDate',
+          label: '创建时间 '
+        }
+      ],
+      //buttongroup的buttons
+      buttons: [{
+          text: '查找',
+          size: 'mini',
+          icon: 'el-icon-search',
+          disabled: false,
+        },
+        {
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          disabled: true,
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          disabled: true,
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          disabled: false,
+        },
+        {
+          text: '审核',
+          size: 'mini',
+          icon: 'el-icon-check',
+          disabled: false,
+        },
+        {
+          text: '退回',
+          size: 'mini',
+          icon: 'el-icon-back',
+          disabled: false,
+        },
+        {
+          text: '打印',
+          size: 'mini',
+          icon: 'el-icon-document',
+          disabled: false,
+        },
+        {
+          text: '导出',
+          size: 'mini',
+          icon: 'el-icon-message',
+          disabled: false,
+        },
+        {
+          text: '统计',
+          size: 'mini',
+          icon: 'el-icon-more',
+          disabled: false,
+        },
+      ],
+      //收款按钮
+      dtlButtons: [{
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          disabled: false
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          disabled: false
+        },
+        // {
+        //   text: '取消',
+        //   size: 'mini',
+        //   icon: 'el-icon-close',
+        //   disabled: false
+        // }
+      ],
+      //侧边栏查询prop
+      originCondition: {
+        formno: {
+          value: '',
+          mode: '不参与',
+          name: '订单编号',
+          dataType: 'string',
+          fieldName: 'formno',
+          tableRelationMode: 'AND',
+          form: 'input'
+        },
+        pFormno: {
+          value: '',
+          mode: '不参与',
+          name: '报价单编号',
+          dataType: 'string',
+          fieldName: 'pFormno',
+          tableRelationMode: 'AND',
+          form: 'input'
+        },
+        customerName: {
+          value: '',
+          mode: '不参与',
+          name: '客户名称',
+          dataType: 'string',
+          fieldName: 'customerName',
+          tableRelationMode: 'AND',
+          form: 'input'
+        },
+        region: {
+          value: '',
+          mode: '不参与',
+          name: '区域',
+          dataType: 'string',
+          fieldName: 'region',
+          tableRelationMode: 'AND',
+          form: 'input'
+        },
+        salesman: {
+          value: '',
+          mode: '不参与',
+          name: '业务员',
+          dataType: 'string',
+          fieldName: 'salesman',
+          tableRelationMode: 'AND',
+          form: 'input'
+        },
+        status: {
+          value: '',
+          mode: '不参与',
+          name: '订单状态',
+          dataType: 'string',
+          fieldName: 'status',
+          tableRelationMode: 'AND',
+          form: 'select',
+          options: []
+        },
+        deliveryDate: {
+          value: ['', ''],
+          mode: '之间',
+          name: '交货日期',
+          dataType: 'date',
+          fieldName: 'deliveryDate',
+          tableRelationMode: 'AND',
+          form: 'date'
+        },
+        createDate: {
+          value: ['', ''],
+          mode: '之间',
+          name: '状态日期',
+          dataType: 'date',
+          fieldName: 'createDate',
+          tableRelationMode: 'AND',
+          form: 'date'
+        }
+      },
+      //表格样式
+      cellRow: {
+        height: '30px',
+        padding: "3px 0"
+      },
+      //查询主表数据的参数
+      condition: {
+        current: 1,
+        offset: 10
+      },
+      currentPaymentForm: [],
+      fullPayment: [],
+      dialogLoading: false
+    },
+    mounted: function() {
+      //初始化axios配置
+      initial()
+      setInterval(() => {
+        this.buttons[3].disabled = this.currentRow === undefined ? true : false
+        this.buttons[4].disabled = this.currentRow === undefined ? true : false
+        this.buttons[5].disabled = this.currentRow === undefined ? true : false
+        this.buttons[6].disabled = this.currentRow === undefined ? true : false
+        //只有当主表有选中数据之后，联系表的新建才可用，因为需要主表的订单信息
+        this.dtlButtons[0].disabled = this.currentRow === undefined ? true : false
+        this.dtlButtons[1].disabled = this.dtlCurrentRow === undefined ? true : false
+        this.dtlButtons[2].disabled = this.dtlCurrentRow === undefined ? true : false
+        // this.dtlButtons[3].disabled = this.dtlCurrentRow === undefined ? true : false
+        //附件
+        // this.upbtn1 = this.currentRow === undefined ? true : false
+        // this.upbtn2 = this.currentRow === undefined ? true : false
+        this.bombtn1 = this.currentRow === undefined ? true : false
+        this.bombtn2 = this.uploadlist.length === 0 ? true : false
+        this.upbtn3 = this.currentId.length === 0 ? true : false
+        this.upbtn4 = this.currentId.length === 1 ? false : true
+      }, 100)
+      this.$el.style.visibility = 'visible'
+      axios.post(this.urlGetQuotationStatus, {
+        orderType: ""
+      }).then(resp => {
+        this.originCondition.status.options = resp.data.data
+      })
+      this.getCollectionInfo()
+    },
+
+
+    methods: {
+      onChange(file, fileList) {
+        this.uploadlist = fileList
+      },
+      onRemove(file, fileList) {
+        this.uploadlist = fileList
+      },
+
+      getFormContact(arg) {
+        // console.log(arg);
+        // for (var p in arg) {
+        //   if (arg[p] != undefined) {
+        //     this.currentPaymentForm[p] = arg[p]
+        //   } else this.currentPaymentForm[p] = ""
+        // }
+        this.fullPayment.forEach(p => {
+          if (p.account == arg.receiptNumber) {
+            this.dtlformItems[2].value = p.accountName
+            this.dtlformItems[6].value = p.name
+            arg.receiptAccount = p.accountName
+            arg.name = p.name
+          }
+        })
+        this.currentPaymentForm = arg
+      },
+      printClicked() {
+        if (this.HdrData.length != 0) {
+          coolSti.view(
+            'SimpleList',
+            'Report',
+            this.printData, {
+              'Today': new Date()
+            },
+            'onSaveReport', //这里需要使用文本的方法名, 不传这个参数则不会有设计器按钮
+            // 该方法需要在window级别设置对应相同名称的方法 ，用于保存新打开窗口中编辑完成的模板
+            '新窗口的名字'
+          )
+        } else this.$message('无有效数据')
+      },
+      getPrintData() {
+        axios.post(this.urlPrint, {
+            formno: this.currentRow.formno
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.printData = res.data
+            }
+          })
+      },
+      // dialogclose() {
+      //   this.currentRow = undefined
+      // },
+      getCurrentForm(arg) {
+        for (var p in arg) {
+          if (arg[p] != undefined) {
+            this.currentFormItems[p] = arg[p]
+          } else this.currentFormItems[p] = ""
+        }
+      },
+      //组合得出查询参数
+      getCondition: function(playload) {
+        for (var prop in this.condition) {
+          if (prop != 'current' && prop != 'offset') {
+            delete this.condition[prop]
+          }
+        }
+        this.condition = Object.assign(this.condition, playload)
+        this.condition.current = 1
+      },
+      //查询历史状态记录
+      getHistory() {
+        var _this = this
+        axios.post(this.urlGetHistory, {
+            formno: this.currentRow.formno
+          })
+          .then(res => {
+            res = res.data
+            _this.historyData = res.data
+          })
+      },
+      //获取主表数据
+      getHdrData: function() {
+        this.tableLoading = true
+        axios.post(this.urlQuery, this.condition, )
+          .then(resp => {
+            switch (resp.data.code) {
+              //登录超时，重新登录
+              case 5000:
+                reLogin(this)
+                break
+                //请求成功
+              case 0:
+                this.HdrData = formatIndex(resp.data.data.records, this.condition.current, this.condition.offset)
+                this.total = resp.data.data.total
+                this.tableLoading = false
+                //查询出数据之后明细表清空，currentRow设为初始值undefined
+                this.DtlData = []
+                this.historyData = []
+                this.ReceiptData = []
+                this.updatedData = []
+                this.currentRow = undefined
+                break
+              case
+              500:
+                defaultError("服务器错误", this, 'tableLoading')
+                break;
+              default:
+                defaultError(resp.data.msg, this, 'tableLoading')
+                break
+            }
+          }).catch((error => {
+            this.$message('服务器异常，请联系管理人员')
+            setTimeout(() => {
+              this.tableLoading = false
+            }, 500)
+          }))
+      },
+      //获取从表数据
+      getDtlData: function(ev) {
+        axios.post(this.urlGetList, {
+            formno: ev.formno
+          })
+          .then(response => (this.DtlData = response.data.data))
+      },
+      //获取收款数据
+      getReceiptData: function(ev) {
+        axios.post(this.urlGetReceipt, {
+            formno: ev.formno
+          })
+          .then(response => (this.ReceiptData = response.data.data))
+      },
+      getBomList: function() {
+        axios.post(this.urlBomList, {
+            orderNum: this.currentRow.formno
+          })
+          .then(res => {
+            var arr = res.data.data;
+            this.formatList(arr);
+            this.bomData = arr;
+          })
+      },
+
+      formatList(arr) {
+        arr.forEach(p => {
+          p.des = p.attributes.des
+          p.ref = p.attributes.ref
+          p.partOL = p.attributes.partOL
+          p.partOW = p.attributes.partOW
+          p.partOT = p.attributes.partOT
+          p.partL = p.attributes.partL
+          p.partW = p.attributes.partW
+          p.partT = p.attributes.partT
+          if (p.children) {
+            this.formatList(p.children)
+          }
+        })
+      },
+      //点击行获得从表数据
+      handleRowClick(arg) {
+        this.dtlCurrentRow = undefined
+        if (arg !== undefined) {
+          this.currentRow = arg
+          this.getDtlData(arg)
+          this.getHistory(arg)
+          this.getReceiptData(arg)
+          this.getPrintData()
+          this.getBomList()
+        }
+        this.uploadData.fkPurposeId = arg.formno
+        this.bomUploadData.orderNum = arg.formno
+        this.getUploadedData(arg)
+      },
+      dltRowClick(arg) {
+        if (arg !== undefined) {
+          this.dtlCurrentRow = arg
+        }
+      },
+      BackTab() {
+        var _this = this
+        axios.post(this.urlGetOrderStatus, {
+            orderType: this.currentRow.orderType
+          })
+          .then(res => {
+            res = res.data
+            console.log(res.data);
+            _this.backItems[1].options = res.data
+          })
+        this.backVisible = true
+        this.backItems[0].value = this.currentRow.status
+      },
+      handleBack() {
+        // console.log(this.currentRow);
+        var _this = this
+        axios.post(this.urlGetBack, {
+            formno: this.currentRow.formno,
+            status: this.currentFormItems.status,
+            newStatus: this.currentFormItems.newStatus,
+            remark: this.currentFormItems.remark
+          })
+          .then(res => {
+            _this.backVisible = false
+            _this.getHdrData()
+          })
+      },
+      //删除单行数据
+      delTab() {
+        if (confirm('确定要删除选定的记录')) {
+          axios.post(this.urlDelete, {
+              formno: this.currentRow.formno
+            })
+            .then(resp => {
+
+              this.getHdrData()
+            })
+        }
+      },
+      buttonsevent(args) {
+        switch (args.currentTarget.textContent) {
+          case '查找':
+            {
+              this.getHdrData()
+              break
+            }
+          case '新建':
+            {
+              bus.$emit('sendData', {
+                hdrData: {},
+                dtlData: [],
+                receiptData: [],
+                urlSave: this.urlSave
+              })
+              break
+            }
+          case '编辑':
+            {
+              bus.$emit('sendData', {
+                hdrData: this.currentRow,
+                dtlData: this.DtlData,
+                receiptData: this.ReceiptData,
+                urlSave: this.urlSave
+              })
+              break
+            }
+          case '删除':
+            {
+              this.delTab()
+              break
+            }
+          case '退回':
+            {
+              this.backItems.forEach(p => {
+                p.value = ""
+              })
+              this.BackTab()
+              break
+            }
+          case '打印':
+            {
+              this.printClicked()
+              break
+            }
+          default:
+            break
+        }
+      },
+      handleSizeChange(arg) {
+        this.condition.current = 1
+        this.condition.offset = arg
+        this.getHdrData()
+      },
+      handlePageChange(arg) {
+        this.condition.current = arg
+        this.getHdrData()
+      },
+
+      getCollectionInfo() {
+        // 获取收款账号编号
+        axios.post(this.urlGetNewReceipt, {
+          code: ''
+        }).then(res => {
+          res = res.data
+          if (res.code == 0 && res.data) {
+            this.fullPayment = res.data
+            var bianhao = {}
+            bianhao = res.data.map(p => {
+              var obj = {}
+              obj.label = p.account
+              obj.value = p.account
+              return obj
+            })
+            this.dtlformItems[1].options = bianhao
+          } else this.$message = '获取数据失败！'
+        })
+        // 获取收款类型
+        axios.post(this.urlGetPayType, {
+          type: "ReceiveType"
+        }).then(res => {
+          res = res.data
+          if (res.code == 0 && res.data) {
+            this.dtlformItems[5].options = res.data
+          } else this.$message = '获取数据失败！'
+        })
+      },
+
+      // 收款新建提交
+      saveContactClick() {
+        var _this = this
+        for (p in this.currentPaymentForm) {
+          if (p != 'description' && p != 'receiptor' && p != 'payBank' && p != 'payAccount' && this.currentPaymentForm[p].length == 0) {
+            console.log(p);
+            this.$message('除支付银行、支付账号及备注外不能为空')
+            return
+          }
+
+          function isNumber(val) {
+            var regPos = /^\d+(\.\d+)?$/; //非负浮点数
+            if (regPos.test(val)) {
+              return true;
+            } else {
+              return false;
+            }
+          }
+          if (p == 'amount' && isNumber(this.currentPaymentForm[p]) != true) {
+            this.$message('收款金额格式有误')
+            return
+          }
+        }
+        this.dialogLoading = true
+        axios.post(this.urlSaveReceipt, this.currentPaymentForm)
+          .then(res => {
+            var test = checkCode(res.data.code, res.data.msg, this, 'dialogLoading');
+            if (test) {
+              this.$message('上传成功!')
+              this.getReceiptData(this.currentRow)
+              this.dialogReceiptVisible = false
+              this.dialogLoading = false
+            }
+          })
+      },
+      updateContactClick() {
+        var sign = true
+        for (p in this.currentPaymentForm) {
+          if (p != 'description' && p != 'receiptor' && p != 'payBank' && p != 'payAccount' && this.currentPaymentForm[p].length == 0) {
+            console.log(p);
+            this.$message('除支付银行、支付账号及备注外不能为空')
+            return
+          }
+
+          function isNumber(val) {
+            var regPos = /^\d+(\.\d+)?$/; //非负浮点数
+            if (regPos.test(val)) {
+              return true;
+            } else {
+              return false;
+            }
+          }
+          if (p == 'amount' && isNumber(this.currentPaymentForm[p]) != true) {
+            this.$message('收款金额格式有误')
+            return
+          }
+        }
+        this.dialogLoading = true
+        this.currentPaymentForm.id = this.dtlCurrentRow.id
+        this.currentPaymentForm.ts = this.dtlCurrentRow.ts
+        axios.post(this.urlUpdateReceipt, this.currentPaymentForm)
+          .then(res => {
+            var test = checkCode(res.data.code, res.data.msg, this, 'dialogLoading');
+            if (test) {
+              this.dialogLoading = false
+              this.$message('上传成功!')
+              this.getReceiptData(this.currentRow)
+              this.dialogReceiptVisible2 = false
+            }
+          })
+      },
+      //收款表按钮点击事件
+      dtlButtonsevent(args) {
+        switch (args.currentTarget.textContent) {
+          case '新建':
+            {
+              // this.dtlCurrentRow = undefined
+              this.currentPaymentForm = []
+              this.dtlformItems.forEach(p => {
+                if (p.name != 'formno') {
+                  p.value = ''
+                }
+              })
+              this.dtlformItems[0].value = this.currentRow.formno
+              this.getCollectionInfo()
+              this.dialogReceiptVisible = true
+              break
+            }
+          case '编辑':
+            {
+              this.dtlformItems.forEach(p => {
+                p.value = this.dtlCurrentRow[p.name]
+              })
+              this.dialogReceiptVisible2 = true
+            }
+            break
+          case '删除':
+            {
+              axios.post(this.urlDeleteReceipt, {
+                id: this.dtlCurrentRow.id
+              })
+              .then(resp => {
+                this.getReceiptData(this.currentRow)
+              })
+            }
+        }
+      },
+
+      //上传附件
+      // 获取附件列表
+      getUploadedData() {
+        // console.log(ev.formno);
+        axios.post(this.urlGetUploadedData, {
+            code: this.currentRow.formno,
+            purpose: "fileInfoOrder"
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.updatedData = res.data
+            }
+          })
+      },
+      // 勾选事件
+      uploadedSelect(arg) {
+        this.currentId = []
+        if (arg.length != 0) {
+          this.currentAttachInfo = arg[0].name
+        }
+        arg.forEach(p => {
+          this.currentId.push(p.id)
+        })
+      },
+      delUploaded() {
+        var _this = this
+        axios.post(this.urlDelUploaded, {
+            ids: this.currentId
+          })
+          .then(res => {
+            var test = checkCode(res.data.code, res.data.msg, this);
+            if (test) {
+              res = res.data
+              _this.$message('删除附件成功!')
+              _this.currentId = []
+              _this.getUploadedData()
+            }
+          })
+      },
+      downloadAttachment() {
+        axios.post(this.urlDownload, {
+            id: this.currentId[0],
+          }, {
+            responseType: 'blob'
+          })
+          .then(res => {
+            this.download(res.data)
+          })
+      },
+      download(data) {
+        if (!data) {
+          return
+        }
+        let url = window.URL.createObjectURL(new Blob([data]))
+        let link = document.createElement('a')
+        link.style.display = 'none'
+        link.href = url
+        link.setAttribute('download', this.currentAttachInfo)
+
+        document.body.appendChild(link)
+        link.click()
+        this.$refs.multipleTable.clearSelectionOuter();
+      },
+
+      submitUpload() {
+        if (this.uploadlist.length != 0) {
+          this.$refs.upload.submit();
+        } else {
+          this.$message('待上传文件列表为空')
+        }
+      },
+      // 上传个数限制
+      handleExceed(files, fileList) {
+        this.$message.warning(`当前限制选择 5 个文件，本次已选择了 ${files.length} 个文件，如有更多文件请分批上传`);
+        // 共选择了 ${files.length + fileList.length} 个文件
+      },
+
+    }
+  })
+</script>

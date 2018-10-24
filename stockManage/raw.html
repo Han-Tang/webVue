@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>原材料库存管理</title>
+  <!-- 引入vue -->
+  <script src="../scripts/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- 引入element组件库 -->
+  <script src="../scripts/element-ui/index.js"></script>
+  <!-- 引入公共内容 -->
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../common.js"></script>
+  <script src="../scripts/components/button-group.js">
+  </script>
+  <script src="../scripts/components/cool-table.js">
+  </script>
+  <script src="../scripts/components/cool-query.js">
+  </script>
+  <script src="../scripts/components/cool-form.js">
+  </script>
+
+  <style>
+    [v-cloak] {
+      display: none
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0
+    }
+
+    .el-form--inline .el-form-item {
+      margin-right: 0px
+    }
+
+    .el-table th>.cell {
+      min-width: 95px
+    }
+
+    .el-table th {
+      padding: 5px 0
+    }
+  </style>
+</head>
+
+<body>
+  <div id="vm" v-cloak style="height:100%">
+    <el-container style="height:100%;border:1px solid #7A9973;" ref="container">
+      <el-header height="auto">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top:1px solid #7A9973;">
+          <!-- 侧边查询 -->
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <cool-query :origin-condition="originCondition" @get-condition="getCondition">
+            </cool-query>
+          </el-aside>
+
+          <cool-table :buttons="buttons" @button-click="buttonsevent" v-loading="tableLoading" :page="true" border="border" :data="productData" :columns="productColumns" :total="total" :layout="layout" :current-page.sync="condition.current"
+            :page-size.sync="condition.offset" :cell-style="cellRow" @pagination-size-change="paginationSizeChange" @pagination-current-change="paginationCurrentChange" @table-selection-change="selection"></cool-table>
+        </el-container>
+      </el-main>
+    </el-container>
+  </div>
+
+  <script>
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#vm',
+        data: {
+          // url合集
+          urlGetWarehouseData: config + '/storeHdr/queryList',
+          urlQuery: config + '/storeManage/dlt/queryList',
+
+          // 查表数据及各项内容
+          // 表格样式
+          tableLoading: false,
+          cellRow: {
+            height: '30px',
+            padding: '5px 0'
+          },
+          //主表数据
+          productData: [],
+          // 表头内容
+          productColumns: [{
+              prop: 'index',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: 'storeName',
+              label: '存放仓库',
+              fixed: 'fixed'
+            },
+            {
+              prop: 'code',
+              label: '物料编码'
+            },
+            {
+              prop: '',
+              label: '物料名称'
+            },
+            {
+              prop: '',
+              label: '存放数量'
+            },
+            {
+              prop: '',
+              label: '占用数量'
+            },
+            {
+              prop: '',
+              label: '可用库存'
+            },
+            {
+              prop: '',
+              label: '物料规格'
+            },
+            {
+              prop: 'meterial1',
+              label: '主材质'
+            },
+            {
+              prop: 'color1',
+              label: '主花色'
+            },
+            {
+              prop: '',
+              label: '主配色'
+            },
+            {
+              prop: '',
+              label: '物料类型'
+            },
+            {
+              prop: '',
+              label: '物料型号'
+            },
+            {
+              prop: '',
+              label: '单位'
+            },
+            {
+              prop: '',
+              label: '图纸号'
+            },
+            {
+              prop: 'description',
+              label: '备注'
+            }
+          ],
+          total: 0,
+          layout: 'total, sizes, prev, pager, next, jumper',
+          condition: {
+            current: 1,
+            offset: 10
+          },
+          // 查询条件
+          originCondition: {
+            code: {
+              value: '',
+              mode: '不参与',
+              name: '物料编码',
+              dataType: 'string',
+              fieldName: 'code',
+              tableRelationMode: 'AND',
+              form: 'input'
+            },
+            name: {
+              value: '',
+              mode: '不参与',
+              name: '物料名称',
+              dataType: 'string',
+              fieldName: 'name',
+              tableRelationMode: 'AND',
+              form: 'input'
+            },
+            serial: {
+              value: '',
+              mode: '不参与',
+              name: '产品系列',
+              dataType: 'string',
+              fieldName: 'serial',
+              tableRelationMode: 'AND',
+              form: 'input'
+            },
+            no: {
+              value: '',
+              mode: '不参与',
+              name: '产品型号',
+              dataType: 'string',
+              fieldName: 'no',
+              tableRelationMode: 'AND',
+              form: 'input'
+            },
+            location: {
+              value: '',
+              mode: '不参与',
+              name: '存放仓库',
+              dataType: 'string',
+              fieldName: 'location',
+              tableRelationMode: 'AND',
+              form: 'select',
+              options: []
+            },
+            type: {
+              value: '',
+              mode: '不参与',
+              name: '物料类型',
+              dataType: 'string',
+              fieldName: 'type',
+              tableRelationMode: 'AND',
+              form: 'select',
+              options: []
+            }
+          },
+          // 按钮组
+          buttons: [{
+              text: '查找',
+              size: 'mini',
+              icon: 'el-icon-search',
+              disabled: false
+            },
+            {
+              text: '导出',
+              size: 'mini',
+              icon: 'el-icon-message',
+              disabled: false
+            },
+          ],
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          var str = window.location.hash
+          str = str.split(/[#?]/)[1]
+          if (str != undefined && str == 'applyMaterial') {
+            this.buttons[1].text = '确认'
+          }
+          this.getWarehouseData()
+          this.getData()
+          // 获取查询条件选项
+          // 产品系列
+          axios.post(this.urlGetInfo, {
+            type: 'ProductNameType'
+          }).then(res => {
+            this.originCondition.serial.options = res.data.data
+            this.createform[1].options = res.data.data
+          })
+          // 产品花色
+          axios.post(this.urlGetInfo, {
+            type: 'ProductColorType'
+          }).then(res => {
+            this.originCondition.color1.options = res.data.data
+            this.createform[3].options = res.data.data
+          })
+        },
+        methods: {
+           // 表格多选操作
+          selection(arg) {
+            if (arg.length != 0) {
+              this.items = []
+              this.selected = arg
+              // console.log(this.selected);
+              this.selected.forEach(p => {
+                this.items.push(p)
+              })
+            } else this.selected = []
+          },
+          getCondition: function(playload) {
+            for (var prop in this.condition) {
+              if (prop != 'current' && prop != 'offset') {
+                delete this.condition[prop]
+              }
+            }
+            this.condition = Object.assign(this.condition, playload)
+            console.log(this.condition);
+            this.condition.kind = '成品'
+            this.condition.current = 1
+          },
+          // 获取仓库选项
+          getWarehouseData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetWarehouseData, {})
+              .then(function(res) {
+                var test = checkCode(res.data.code, res.data.msg, this, 'waiting');
+                if (test) {
+                  res = res.data
+                  if (res.code == 0 && res.data) {
+                    var storeName = {}
+                    storeName = res.data.records.map(p => {
+                      var obj = {}
+                      obj.label = p.storeName
+                      obj.value = p.id
+                      return obj
+                    })
+                    _this.originCondition.location.options = storeName
+                  }
+                  _this.waiting = false
+                }
+              })
+          },
+          // 主表查询
+          getData() {
+            this.tableLoading = true
+            axios.post(this.urlQuery, {
+              condition: this.condition
+            }).then(res => {
+              var test = checkCode(res.data.code, res.data.msg, this, 'tableLoading');
+              if (test) {
+                res = res.data
+                console.log(res);
+                // var jihe = []
+                // jihe = res.data.records.map((p, index) => {
+                //   var obj = {}
+                //   obj = p.infoProduct
+                //   if (p.productSale != null) {
+                //     obj.unitprice = p.productSale.price
+                //   }
+                //   obj.index = p.index = (index + 1) + (this.condition.current - 1) * this.condition.offset
+                //   return obj
+                // })
+                res.data.records.forEach((p, index) => {
+                  p.index = (index + 1) + (this.condition.current - 1) * this.condition.offset
+                })
+                this.productData = res.data.records
+                this.total = res.data.total
+                this.tableLoading = false
+              } else this.productData = []
+            })
+          },
+          paginationSizeChange(arg) {
+            this.condition.current = 1
+            this.condition.offset = arg
+            this.getData()
+          },
+          paginationCurrentChange(arg) {
+            this.condition.current = arg
+            this.getData()
+          },
+          confirmData() {
+            // console.log(window.parent[0].vm.rawData);
+            window.parent[0].vm.rawData = this.items
+            // console.log(this.items);
+            window.parent.vm.getDialog('dialog2').visible = !window.parent.vm.getDialog('dialog2').visible
+          },
+          // 按钮组
+          buttonsevent(args) {
+            switch (args.currentTarget.textContent) {
+              case '查找':
+                {
+                  this.getData()
+                  break
+                }
+              case '导出':
+                {
+                  this.$message('开发中');
+                  break
+                }
+              case '确认':
+                {
+                  this.confirmData()
+                  break
+                }  
+              default:
+                break
+            }
+          },
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>讯航ERP管理系统</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <link rel="stylesheet" href="../css/index.css">
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/cool-form.js"></script>
+  <script src="../scripts/components/tree-grid.js"></script>
+  <script src="../menu.js"></script>
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+  <style>
+    .el-table td, .el-table th{
+      padding: 5px 0
+    }
+    </style>
+</head>
+
+<body>
+  <div id="root">
+    <el-container>
+      <el-header height="28px">
+        <!-- 按钮组 -->
+        <el-button-group>
+          <el-button type="success" @click="addClick" icon='el-icon-plus' size="mini">添加</el-button>
+          <el-button type="danger" icon='el-icon-delete' size="mini" :disabled="selection.length==0?true:false" @click="deleteClick">删除 </el-button>
+          <el-button type="primary" icon='el-icon-edit' size="mini" :disabled="currentRow===undefined||selection.length!=0?true:false" @click="editClick">编辑 </el-button>
+        </el-button-group>
+      </el-header>
+      <el-main>
+        <!-- tree-grid -->
+        <tree-grid :columns="columns" :tree-structure="true" :data-source="dataSource" style="overflow:auto" @row-click="handleRowClick" @selection-change="handleSelectionChange">
+
+        </tree-grid>
+      </el-main>
+      <!-- 新增dialog -->
+      <el-dialog title="新增/编辑部门" :visible.sync="dialogVisible" width="600px">
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogVisible=false" size="mini">取 消</el-button>
+          <el-button @click="submit" size="mini">保 存</el-button>
+        </el-button-group>
+        <cool-form :form-items="formItems" @update-form="getForm" label-width="120px" size="mini" style="border:1px solid #7A9973;padding-top:20px" @click-events="clickEvents"></cool-form>
+      </el-dialog>
+      <!-- dialog内部选择上级部门dialog -->
+      <el-dialog width="600px" :visible.sync="deptDialogVisible" title="选择上级部门">
+        <el-tree :data="deptTree" :props="defaultProps" @node-click="handleNodeClick"></el-tree>
+      </el-dialog>
+    </el-container>
+  </div>
+</body>
+<script>
+  var root = new Vue({
+    el: '#root',
+    data: {
+      //url
+      urlQuery: config + '/dept/list',
+      urlSave: config + '/dept/save',
+      urlTree: config + '/dept/tree',
+      urlInfo: config + '/dept/info',
+      urlDelete: config + '/dept/delete',
+      //tree-grid
+      dataSource: [],
+      columns: [{
+          text: '部门名称',
+          dataIndex: 'text'
+        },
+        {
+          text: '排序',
+          dataIndex: 'orderNum'
+        },
+        {
+          text: '状态',
+          dataIndex: 'status'
+        }
+      ],
+      cellHeight: {
+        height: '40px'
+      },
+      //新增部门dialog
+      dialogVisible: false,
+      formItems: [{
+          label: '上级部门',
+          value: '',
+          name: 'parentName',
+          type: 'input',
+          prop: '上级部门'
+        },
+        {
+          label: '部门名称',
+          value: '',
+          name: 'name',
+          type: 'input'
+        },
+        {
+          label: '排序',
+          value: '',
+          name: 'orderNum',
+          type: 'input'
+        },
+        {
+          label: '状态',
+          value: '',
+          name: 'status',
+          type: 'input'
+        }
+      ],
+      //选择上级部门dialog
+      deptDialogVisible: false,
+      defaultProps: {
+        children: 'children',
+        label: 'text'
+      },
+      deptTree: [],
+      //当前行详细数据，有点击行事件发起请求获得
+      detail: undefined,
+      //select事件选择出的行数的id合集，用于删除
+      ids: [],
+      selection: [],
+      currentRow: undefined,
+      //保存编辑容器
+      dept: undefined,
+    },
+    mounted() {
+      //初始化，使可见，获取部门列表
+      initial()
+      this.$el.style.visibility = 'visible'
+      this.getData()
+      this.getTree()
+    },
+    methods: {
+      //添加，清空formitems，改url，设置detail为undefinded来给编辑添加ts和id
+      addClick() {
+        this.formItems.map(p => p.value = '')
+        this.detail = undefined
+        this.urlSave = config + '/dept/save'
+        this.dialogVisible = true
+      },
+      //获取cool-form传出数据
+      getForm(arg) {
+        this.dept = arg
+      },
+      //获取表格数据
+      getData() {
+        axios.post(this.urlQuery, {
+          name: ''
+        }).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this);
+          if (test) {
+            this.dataSource = resp.data.data;
+          }
+        })
+
+      },
+      //获取部门树
+      getTree() {
+        axios.post(this.urlTree).then(resp => {
+          this.deptTree.push(resp.data.data)
+        })
+      },
+      //编辑
+      editClick() {
+        this.urlSave = config + '/dept/update'
+        this.dialogVisible = true
+      },
+      //删除
+      deleteClick() {
+        if (confirm('确定要删除选定的记录')) {
+          var arr = []
+          this.selection.forEach(p => {
+            arr.push(p.id)
+          })
+          var loading = setLoading(this)
+          axios.post(this.urlDelete, arr).then(resp => {
+            var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+            if (test) {
+              setTimeout(() => {
+                this.$message(resp.data.msg);
+                loading.close()
+              }, 500);
+              this.getData();
+            }
+          }).catch((error) => {
+            setTimeout(() => {
+              this.$message.error('请求异常，请联系管理员');
+              loading.close()
+            }, 500)
+          })
+        }
+
+      },
+      //cool-form点击事件。传出来判断是哪个lable所在的输入行被点击了
+      clickEvents(ev) {
+        switch (ev.target.name) {
+          case '上级部门':
+            this.deptDialogVisible = true
+            break
+          default:
+            break
+        }
+      },
+      //table多选
+      handleSelectionChange(selection) {
+        var that = this
+        if (selection.length != 0) {
+          this.selection = selection
+          this.ids = []
+          selection.forEach(p => {
+            that.ids.push(p.id)
+          })
+        } else this.selection = []
+      },
+      //树节点点击
+      handleNodeClick(arg) {
+        this.dept.parentName = arg.text
+        this.formItems[0].value = arg.text
+        this.parentId = arg.id
+        this.deptDialogVisible = false
+      },
+      //table行点击，获取detail
+      handleRowClick(arg) {
+        this.currentRow = arg
+        axios.post(this.urlInfo, {
+          id: this.currentRow.id
+        }).then(resp => {
+          this.detail = resp.data.data
+          this.formItems.forEach(p => {
+            p.value = this.detail[p.name]
+          })
+        })
+
+      },
+      //报存
+      submit() {
+        this.dept.parentId = this.parentId
+        if (this.detail) {
+          this.dept.id = this.detail.id
+          this.dept.ts = this.detail.ts
+          this.dept.parentId = this.detail.parentId
+        }
+        var loading = setLoading(this)
+        axios.post(this.urlSave, this.dept).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500);
+            this.dialogVisible = false;
+            this.getData();
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+
+      }
+    }
+  })
+</script>
