@@ -1,0 +1,98 @@
+body {
+  margin: 0;
+}
+
+/* 各种纵向填充容器和防止滚动条出现 */
+html,
+body,
+#root,
+.el-container,
+.el-tabs,
+.el-tabs__content,
+.el-tab-pane {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 布局容器搞毛padding？？ */
+.el-header,
+.el-main {
+  padding: 0;
+}
+
+/* 取消iframe默认大小和边框 */
+.el-tab-pane iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* 修正el-tabs的纵向填充容器问题 */
+.el-tabs__content {
+  box-sizing: border-box;
+  margin-top: -40px;
+  border-top-style: solid;
+  border-top-width: 40px;
+  border-top-color: rgba(0, 0, 0, 0);
+}
+
+/* 修正el-tabs__content（上一修改）覆盖header问题 */
+.el-tabs__header {
+  z-index: 1;
+}
+
+.el-menu:not(.el-menu--collapse) {
+  width: 160px;
+}
+
+/* 隐藏菜单滚动条 */
+.aside-menu {
+  margin-right: -18px;
+  overflow: hidden scroll;
+}
+
+/* 遮挡隐藏的滚动条 */
+.main-tabs {
+  background-color: #fff
+}
+
+/* 头部收缩按钮 */
+.header-collapse-button {
+  display: block;
+  width: 100%;
+  padding: 3px;
+}
+
+.header-collapse-button:hover {
+  padding: 10px;
+}
+
+/* 菜单收缩按钮 */
+.menu-collapse-button {
+  padding: 3px;
+  height: 100%
+}
+
+.menu-collapse-button:hover {
+  padding: 10px;
+}
+
+/* 避免vue未加载前出现难看的花括号 */
+#root {
+  visibility: hidden;
+}
+
+/* chrome浏览器flex和height：100%冲突的解决方法 */
+.el-main .el-container {
+  position: absolute;
+  width: 100%;
+  height: 100%
+}
+
+.el-main {
+  position: relative
+}
+
+.el-tabs__header {
+  margin: 0
+}

@@ -1,0 +1,392 @@
+/* #7A9973 */
+/* #DCDFE6 */
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app, .wrapper {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'PingFang SC', "Helvetica Neue", Helvetica, "microsoft yahei", arial, STHeiTi, sans-serif;
+}
+
+a {
+  text-decoration: none
+}
+
+.el-tabs, .el-tabs__content, .el-tab-pane {
+  height: 100%
+}
+
+.el-tabs__header {
+  z-index: 1;
+}
+
+.el-tabs__content {
+  box-sizing: border-box;
+  margin-top: -40px;
+  border-top-style: solid;
+  border-top-width: 40px;
+  border-top-color: rgba(0, 0, 0, 0);
+}
+
+.content-box {
+  position: absolute;
+  left: 200px;
+  right: 0;
+  top: 60px;
+  bottom: 0;
+  overflow-y: scroll;
+  -webkit-transition: left .3s ease-in-out;
+  transition: left .3s ease-in-out;
+  background: #F1F2ED;
+}
+
+.content {
+  width: auto;
+  /* padding: 20px; */
+}
+
+.content-collapse {
+  left: 65px;
+}
+
+/* .container {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+} */
+.pagination {
+  margin: 20px 0;
+  text-align: right;
+}
+
+.crumbs {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.plugins-tips {
+  padding: 20px 10px;
+  margin-bottom: 20px;
+}
+
+.el-button+.el-tooltip {
+  margin-left: 10px;
+}
+
+.el-table tr:hover {
+  background: #f6faff;
+}
+
+.mgb20 {
+  margin-bottom: 20px;
+}
+
+.move-enter-active, .move-leave-active {
+  transition: opacity .5s;
+}
+
+.move-enter, .move-leave {
+  opacity: 0;
+}
+
+/*BaseForm*/
+.form-box {
+  width: 600px;
+}
+
+.form-box .line {
+  text-align: center;
+}
+
+.el-time-panel__content::after, .el-time-panel__content::before {
+  margin-top: -7px;
+}
+
+.el-time-spinner__wrapper .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default) {
+  padding-bottom: 0;
+}
+
+/*Upload*/
+/* .pure-button {
+  width: 150px;
+  height: 40px;
+  line-height: 40px;
+  text-align: center;
+  color: #fff;
+  border-radius: 3px;
+}
+
+.g-core-image-corp-container .info-aside {
+  height: 45px;
+}
+
+.el-upload--text {
+  background-color: #fff;
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  box-sizing: border-box;
+  width: 360px;
+  height: 180px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+} */
+/* .el-upload--text .el-icon-upload {
+  font-size: 67px;
+  color: #97a8be;
+  margin: 40px 0 16px;
+  line-height: 50px;
+}
+
+.el-upload--text {
+  color: #97a8be;
+  font-size: 14px;
+  text-align: center;
+}
+
+.el-upload--text em {
+  font-style: normal;
+} */
+/*VueEditor*/
+.ql-container {
+  min-height: 400px;
+}
+
+.ql-snow .ql-tooltip {
+  transform: translateX(117.5px) translateY(10px) !important;
+}
+
+.editor-btn {
+  margin-top: 20px;
+}
+
+/*markdown*/
+.v-note-wrapper .v-note-panel {
+  min-height: 500px;
+}
+
+.upload-demo .el-upload--text {
+  width: 68px;
+  height: 28px;
+  border: 0px;
+  margin-right: 10px;
+}
+
+.el-upload--text {
+  height: 100px
+}
+
+.el-dialog .el-col {
+  margin-bottom: 20px;
+  text-align: center
+}
+
+/* .container .el-pagination {
+  margin-top: 5px
+} */
+div .el-dialog__footer, div .el-dialog__header {
+  text-align: center;
+}
+
+.el-table th>.cell {
+  min-width: 95px
+}
+
+.el-tabs__content .container {
+  padding: 0px
+}
+
+.el-picker-panel {
+  width: 310px
+}
+
+.sidebar .el-menu-item {
+  background-color: #242f42;
+  border-left: #d9d9d9 5px solid
+}
+
+.tablecontainer .el-table th {
+  padding: 5px 0
+}
+
+.querybar {
+  background-color: #EFF8ED;
+  border: 1px solid #7A9973;
+  color: #333;
+}
+
+.querybar span:first-child {
+  width: 218px;
+  border-right: 1px solid #7A9973;
+  display: inline-block;
+  height: 28px;
+  line-height: 28px
+}
+
+.querybar span:last-child {
+  display: inline-block;
+  height: 28px;
+  line-height: 28px;
+}
+
+.el-header {
+  padding: 0px
+}
+
+.tablecontainer {
+  color: #fff;
+  border-right: 1px solid #7A9973;
+  border-bottom: 1px solid #7A9973;
+  /* overflow: hidden */
+}
+
+.tablecontainer el-main {
+  border-bottom: 1px solid #7A9973
+}
+
+.el-footer {
+  padding: 0
+}
+
+.tablecontainer .el-footer {
+  padding: 0px;
+}
+
+.tablecontainer .el-footer {
+  padding: 0px;
+}
+
+.tablecontainer .el-main {
+  padding: 0px;
+  border-bottom: 2px solid #7A9973;
+  overflow: hidden
+}
+
+.sidequery {
+  background-color: #fff;
+  color: #333;
+  text-align: center;
+  border-right: 1px solid #7A9973;
+}
+
+.sidequery .sidetitle {
+  height: 34px;
+  line-height: 34px;
+  text-align: center;
+  color: black;
+}
+
+/* .tablecontainer .el-footer .el-tabs{
+    height:34vh
+  }
+  .tablecontainer .el-footer .el-tabs__content{
+      height: 30vh
+  } */
+/* .tablecontainer .el-footer .el-tabs__content .el-tab-pane .container{
+      height: 28vh
+  } */
+.tablecontainer .el-tabs {
+  /* border-bottom: 1px solid #7A9973 */
+}
+
+/* .tablecontainer .el-tabs .el-main{
+      height: 23vh
+  } */
+.el-table {
+  overflow: auto
+}
+
+.editInput {
+  width: 80%;
+  padding-left: 20px;
+}
+
+.top-text {
+  display: inline-block;
+  position: absolute;
+}
+
+.el-form-item__content .editInput {
+  padding-left: 0px
+}
+
+.el-form-item__content {
+  margin-left: 10px
+}
+
+.el-dialog__body .tablecontainer .el-container .el-main {
+  height: 300px
+}
+
+.el-footer .el-tabs--border-card>.el-tabs__content {
+  padding: 0px
+}
+
+.configuration .tablecontainer .el-main {
+  height: 100%;
+  border-bottom: 0px
+}
+
+.configuration .tablecontainer .el-container {
+  height: 100%
+}
+
+/* 阻止单元格自动换行 */
+.cool-table .el-table .cell {
+  white-space: nowrap
+}
+
+.el-main {
+  padding: 0px
+}
+
+.tablecontainer .el-tabs__item {
+  height: 30px;
+  line-height: 30px
+}
+
+.new-header .el-form--inline .el-form-item {
+  margin-right: 0px
+}
+
+.new-header .el-footer {
+  padding: 0
+}
+
+.content-box .el-aside, .el-main {
+  overflow: hidden
+}
+
+.content-box .el-form--inline .el-form-item {
+  margin-right: 0px
+}
+
+.content-box .el-table__body-wrapper {
+  overflow: auto
+}
+
+.el-form--inline .el-form-item {
+  margin-right: 0px;
+}
+
+.el-table__body-wrappe {
+  overflow: auto
+}
+
+.cool-table cell {
+  height: 28px;
+  padding: 2px 0;
+}
+
+.cool-table th {
+  height: 30px;
+  padding: 5px
+}
