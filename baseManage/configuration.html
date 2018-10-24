@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>讯航ERP管理系统</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- <link rel="stylesheet" href="../css/index.css"> -->
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/button-group.js">
+  </script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/cool-form.js"></script>
+  <!-- <script src="../menu.js"></script> -->
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+</head>
+
+<body>
+  <!-- 此页面注释同产品资料一起使用 -->
+  <div id="root">
+    <el-container style="height:100%;margin:0;position: absolute;width: 100%;border:1px solid #7A9973;">
+      <el-header height="auto">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top:1px solid #7A9973;">
+          <!-- 查询侧边栏 -->
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <cool-query :origin-condition="originCondition" @get-condition="getCondition"></cool-query>
+          </el-aside>
+          <cool-table ref="multipleTable" :page="true" :columns="columns" :total="total" :cell-style="cellRow" @pagination-size-change="handleSizeChange" :v-loading="tableLoading" :data="data" :page-size.sync="condition.offset" :layout="layout"
+            border="border" @table-selection-change="handleSelect" @pagination-current-change="handlePageChange">
+          </cool-table>
+        </el-container>
+      </el-main>
+      <!-- 新建对话框 -->
+      <el-dialog title="新建/编辑配置资料" :visible.sync="dialogVisible" width="600px" @close="closeDialog">
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogVisible=false" size="mini">取 消</el-button>
+          <el-button @click="saveClick" size="mini">保 存</el-button>
+        </el-button-group>
+        <el-form :model="form" :inline="true" size="mini" style="border:1px solid #7A9973;padding-top:20px">
+          <el-form-item label="编号" :label-width="formLabelWidth">
+            <el-input v-model="form.code" auto-complete="off"></el-input>
+          </el-form-item>
+          <el-form-item label="名称" :label-width="formLabelWidth">
+            <el-input v-model="form.name" auto-complete="off"></el-input>
+          </el-form-item>
+          <el-form-item label="分组" :label-width="formLabelWidth" style="width:100%">
+            <el-select v-model="form.type" placeholder="请选择分组">
+              <el-option v-for="item in customerTypes" :key="item.index" :value="item.value" :label="item.label"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="备注" :label-width="formLabelWidth" style="width:100%">
+            <el-input v-model="form.remark" auto-complete="off" style="width:300px"></el-input>
+          </el-form-item>
+        </el-form>
+      </el-dialog>
+    </el-container>
+  </div>
+</body>
+<script>
+  var root = new Vue({
+    el: '#root',
+    data: {
+      //url合集
+      urlQuery: config + '/info/list',
+      urlSave: config + '/info/save',
+      urlDelete: config + '/info/delete',
+      urlGetEnum: config + '/info/infoEnum',
+      //表格数据
+      columns: [{
+          label: '可用',
+          type: 'selection'
+        },
+        {
+          prop: 'index',
+          fixed: 'fixed',
+          width: '50px'
+        },
+        {
+          prop: 'code',
+          label: '编号'
+        },
+        {
+          prop: 'name',
+          label: '名称'
+        },
+        {
+          prop: 'description',
+          label: '分组'
+        },
+        {
+          prop: 'remark',
+          label: '备注'
+        }
+      ],
+      data: [],
+      tableLoading: false,
+      total: undefined,
+      selection: [],
+      layout: 'total, sizes, prev, pager, next, jumper',
+      condition: {
+        current: 1,
+        offset: 10
+      },
+      //新建对话框数据
+      dialogVisible: false,
+      formLabelWidth: '100px',
+      form: {},
+      customerTypes: [],
+      size: 'mini',
+      //删除数据传递的id数组，可以不要，在传递之前进行数据处理得到
+      ids: [],
+      cellRow: {
+        height: '30px',
+        padding: "3px 0"
+      },
+      //侧边栏查询props
+      originCondition: {
+        code: {
+          value: '',
+          name: '编号',
+          fieldName: 'code',
+          form: 'input'
+        },
+        name: {
+          value: '',
+          name: '名称',
+          fieldName: 'name',
+          form: 'input'
+        },
+        type: {
+          value: '',
+          name: '分组',
+          fieldName: 'type',
+          form: 'select',
+          options: []
+        },
+        remark: {
+          value: '',
+          name: '备注',
+          fieldName: 'remark',
+          form: 'input'
+        }
+      },
+      buttons: [{
+          text: '查找',
+          size: 'mini',
+          icon: 'el-icon-search',
+          nativeType: '',
+          disabled: false,
+        },
+        {
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          nativeType: '',
+          disabled: false,
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          nativeType: '',
+          disabled: false,
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          nativeType: '',
+          disabled: true,
+        }
+      ]
+    },
+    mounted() {
+      initial()
+      this.$el.style.visibility = 'visible'
+      this.getData()
+      axios.post(this.urlGetEnum)
+        .then(resp => {
+          this.customerTypes = resp.data.data
+          this.originCondition.type.options = resp.data.data
+        }).catch((error) => {
+          this.$message('请求异常，请联系管理员')
+        })
+      setInterval(() => {
+        this.buttons[2].disabled = this.selection.length === 1 ? false : true
+        this.buttons[3].disabled = this.selection.length === 0 ? true : false
+
+      }, 100)
+    },
+    methods: {
+      getCondition(playload) {
+        for (var prop in this.condition) {
+          if (prop != 'current' && prop != 'offset') {
+            delete this.condition[prop]
+          }
+        }
+        this.condition = Object.assign(this.condition, playload)
+        this.condition.current = 1
+      },
+      getData() {
+        this.tableLoading = true
+        this.condition.current = this.condition.current
+        this.condition.offset = this.condition.offset
+        axios.post(this.urlQuery, this.condition).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, 'tableLoading');
+          if (test) {
+            this.tableLoading = false
+            this.data = formatIndex(resp.data.data.records, this.condition.current, this.condition.offset)
+            this.total = resp.data.data.total
+            this.selection = []
+          }
+          //                        switch (resp.data.code) {
+          //                            case 5000:
+          //                                reLogin(this)
+          //                                break;
+          //                            case 0:
+          //                                this.tableLoading = false
+          //                                this.data = formatIndex(resp.data.data.records, this.condition.current, this.condition.offset)
+          //                                this.total = resp.data.data.total
+          //                                this.currentRow = undefined
+          //                                break;
+          //                            default:
+          //                                defaultError(resp.data.msg, this, 'tableLoading')
+          //                                break;
+          //                        }
+
+        })
+      },
+      //新建/编辑保存
+      saveClick() {
+        var type = this.form.type
+        this.customerTypes.forEach(p => {
+          if (p.code == type) this.form.description = p.name
+        })
+        // if (this.currentRow != undefined) {
+        //   this.form.id = this.currentRow.id
+        //   this.form.ts = this.currentRow.ts
+        // }
+        this.form.id = this.selection[0].id
+        this.form.ts = this.selection[0].ts
+        var loading = setLoading(this)
+        axios.post(this.urlSave, this.form).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500)
+            this.getData()
+          }
+          //                        switch (resp.data.code) {
+          //                            case 5000:
+          //                                reLogin(this)
+          //                                break;
+          //                            case 0:
+          //                                setTimeout(() => { this.$message(resp.data.msg); loading.close() }, 500)
+          //                                this.getData()
+          //                                break;
+          //                            default:
+          //                                defaultError(resp.data.msg, this, loading)
+          //                                break;
+          //                        }
+        })
+        this.dialogVisible = false
+      },
+      delTab() {
+        if (confirm('确定要删除选定的记录')) {
+          var loading = setLoading(this)
+          axios.post(this.urlDelete, this.ids).then(resp => {
+            var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+            if (test) {
+              setTimeout(() => {
+                this.$message(resp.data.msg);
+                loading.close()
+              }, 500)
+              this.getData()
+            }
+            //                        switch (resp.data.code) {
+            //                            case 5000:
+            //                             reLogin(this)
+            //                              break;
+            //                            case 0:
+            //                            setTimeout(()=>{this.$message(resp.data.msg);loading.close()},500)
+            //                            this.getData()
+            //                            break
+            //                            default:
+            //                            defaultError(resp.data.msg, this,loading)
+            //                                break;
+            //                        }
+          }).catch((error) => {
+            setTimeout(() => {
+              this.$message.error('请求异常，请联系管理员');
+              loading.close()
+            }, 500)
+          })
+        }
+      },
+      handleSelect(selection) {
+        var that = this
+        if (selection.length != 0) {
+          this.ids = []
+          this.selection = selection
+          selection.forEach(p => {
+            that.ids.push(p.id)
+          })
+        } else this.selection = []
+      },
+      handleSizeChange(arg) {
+        this.condition.current = 1
+        this.condition.offset = arg
+        this.getData()
+      },
+      handlePageChange(arg) {
+        this.condition.current = arg
+        this.getData()
+      },
+      buttonsevent: function(args) {
+        switch (args.currentTarget.textContent) {
+          case '查找':
+            {
+              this.getData()
+              break
+            }
+          case '新建':
+            {
+              this.$refs.multipleTable.clearSelectionOuter()
+              this.urlSave = config + '/info/save'
+              this.form = {}
+              this.dialogVisible = true
+              break
+            }
+          case '编辑':
+            {
+              this.urlSave = config + '/info/update'
+              this.dialogVisible = true;
+              if (this.selection) {
+                this.form = this.selection[0]
+              }
+              break
+            }
+          case '删除':
+            {
+              this.delTab()
+              break
+            }
+        }
+      },
+      closeDialog() {
+        this.$refs.multipleTable.clearSelectionOuter()
+      }
+    }
+  })
+</script>

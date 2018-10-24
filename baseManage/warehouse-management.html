@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>仓库管理</title>
+  <!-- 引入vue -->
+  <script src="../scripts/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- 引入element组件库 -->
+  <script src="../scripts/element-ui/index.js"></script>
+  <!-- 引入公共内容 -->
+  <script src="../common.js"></script>
+  <script src="../scripts/components/button-group.js">
+  </script>
+  <!-- <script src="../scripts/components/inventory-table.js">
+  </script> -->
+  <script src="../scripts/components/cool-table.js">
+  </script>
+  <script src="../scripts/components/dialog-form.js">
+  </script>
+
+  <style>
+    [v-cloak] {
+      display: none
+    }
+
+    html,
+    body {
+      overflow: hidden;
+      height: 100%;
+      margin: 0
+    }
+
+    .rawdialog .el-dialog__body {
+      padding-top: 0px
+    }
+
+    .el-form--inline .el-form-item {
+      margin-right: 0px
+    }
+
+    .el-table th>.cell {
+      min-width: 95px
+    }
+
+    .el-table th {
+      padding: 5px 0
+    }
+  </style>
+</head>
+
+
+<body>
+  <div id="vm" v-cloak style="height:100%">
+    <el-container ref="container" style="height:100%;border:1px solid #7A9973;">
+      <!-- <el-header style="height:28px;padding-left:0px">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="padding:0;"> -->
+      <!-- <inventory-table :pag="false" v-loading="waiting" :data="warehouseData" :columns="productColumns" :total="total" :layout="layout" :page-size.sync="pagination.pageSize" :current-page.sync="pagination.page" @selection="selection"></inventory-table> -->
+      <cool-table ref="multipleTable" :buttons="buttons" @button-click="buttonsevent" v-loading="waiting" :columns="productColumns" :total="total" :cell-style="cellRow" :data="warehouseData" :layout="layout" border="border" @table-selection-change="selection"></cool-table>
+      <!-- @clearselection="clearSelectionOuter" -->
+      <!-- </el-main> -->
+    </el-container>
+
+    <!-- 新建仓库弹框 -->
+    <el-dialog class="rawdialog" title="新建仓库" :visible.sync="dialogVisible1" width="600px" center :close-on-click-modal="false" v-loading="dialogWaiting" element-loading-text="资料上传中" element-loading-background="rgba(0, 0, 0, 0.8)" @close="dialogclose">
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button size="mini" @click="newWarehouse">保 存</el-button>
+        <el-button size="mini" @click="dialogVisible1=false">返 回</el-button>
+      </el-button-group>
+
+      <dialog-form style="border:1px solid #7A9973;padding-top:20px;padding-left:5px" :form-items="formItems" size="mini" :inline="true" label-width="70px" @updateform='getWarehouse'></dialog-form>
+    </el-dialog>
+
+    <!-- 编辑仓库弹框 -->
+    <el-dialog class="rawdialog" title="编辑仓库" :visible.sync="dialogVisible2" width="600px" center :close-on-click-modal="false" v-loading="dialogWaiting" element-loading-text="资料上传中" element-loading-background="rgba(0, 0, 0, 0.8)" @close="dialogclose">
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button size="mini" @click="updateEditData">保 存</el-button>
+        <el-button size="mini" @click="dialogVisible2=false">返 回</el-button>
+      </el-button-group>
+
+      <dialog-form style="border:1px solid #7A9973;padding-top:20px;padding-left:5px" :form-items="formItems" size="mini" :inline="true" label-width="70px" @updateform='getWarehouse'></dialog-form>
+    </el-dialog>
+  </div>
+
+  <script>
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#vm',
+        data: {
+          // url集合
+          urlGetData: config + '/storeHdr/queryList',
+          urlNewWarehouse: config + '/storeHdr/save',
+          urlGetEditData: config + '/storeHdr/queryDetail',
+          urlUpdateEditData: config + '/storeHdr/edit',
+          urlDel: config + '/storeHdr/delete',
+
+          dialogVisible1: false,
+          dialogVisible2: false,
+          dialogWaiting: false,
+          waiting: false,
+          warehouseData: undefined,
+          ts: undefined,
+          ids: [],
+          cellRow: {
+            height: '30px',
+            padding: "3px 0"
+          },
+          selected: [],
+          // 分页
+          total: 0,
+          pagination: {
+            page: 1,
+            pageSize: 10000
+          },
+          // 分页样式
+          layout: 'total,prev,pager,next,jumper',
+          //表格表头
+          productColumns: [{
+            label: '可用',
+            type: 'selection'
+          }, {
+            prop: 'index',
+            width: '50px'
+          }, {
+            prop: "storeName",
+            label: "名称"
+          }, {
+            prop: "storeNo",
+            label: "编码"
+          }, {
+            prop: "storeLocation",
+            label: "位置"
+          }, {
+            prop: "description",
+            label: "备注"
+          }],
+          // 按钮样式
+          buttons: [{
+              text: '新建',
+              size: 'mini',
+              icon: 'el-icon-plus',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '编辑',
+              size: 'mini',
+              icon: 'el-icon-edit',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            },
+            {
+              text: '删除',
+              size: 'mini',
+              icon: 'el-icon-delete',
+              nativeType: '',
+              disabled: false,
+              plain: '',
+              autofocus: false,
+              round: '',
+              key: undefined
+            }
+          ],
+          // dialog-form表单数据抬头
+          formItems: [{
+              type: 'input',
+              value: '',
+              label: '仓库名称',
+              name: 'storeName',
+              style: {
+                width: '50%',
+                'text-align': 'center',
+              }
+            },
+            {
+              type: 'input',
+              value: '',
+              label: '仓库编码',
+              name: 'storeNo',
+              style: {
+                width: '50%'
+              }
+            },
+            {
+              type: 'input',
+              value: '',
+              label: '位置',
+              name: 'storeLocation',
+              style: {
+                width: '50%',
+                'text-align': 'center',
+              }
+            },
+            {
+              type: 'input',
+              value: '',
+              label: '备注',
+              name: 'description',
+              style: {
+                width: '50%'
+              }
+            }
+          ],
+          // 动态刷新表单
+          currentFormItems: undefined,
+        },
+        mounted() {
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          // 计算表格高度
+          setInterval(() => {
+            this.buttons[1].disabled = this.selected.length === 1 ? false : true
+            this.buttons[2].disabled = this.selected.length === 0 ? true : false
+          }, 100)
+          this.getData()
+        },
+        methods: {
+          // 获取form表单内容
+          getWarehouse(arg) {
+            console.log(arg);
+            this.currentFormItems = arg
+          },
+          // 获取仓库列表
+          getData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetData, {})
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'waiting');
+                if (test) {
+                  // console.log(res)
+                  res = res.data
+                  if (res.code == 0 && res.data) {
+                    // _this.total = res.data.total
+                    res.data.records.forEach((p, index) => {
+                      p.index = (index + 1)
+                    })
+                    _this.warehouseData = res.data.records
+                  }
+                  _this.waiting = false
+                }
+              })
+          },
+          // 新建仓库
+          newWarehouse() {
+            this.dialogWaiting = true
+            var _this = this
+            axios.post(this.urlNewWarehouse, {
+                storeName: this.currentFormItems.storeName,
+                storeNo: this.currentFormItems.storeNo,
+                storeLocation: this.currentFormItems.storeLocation,
+                description: this.currentFormItems.description
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'dialogWaiting');
+                if (test) {
+                  _this.$message("新建成功")
+                  _this.dialogWaiting = false
+                  _this.dialogVisible1 = false
+                  _this.selected = []
+                  _this.getData()
+                }
+              })
+          },
+          // 获取编辑数据
+          getEditData() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlGetEditData, {
+                id: this.ids[0]
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'waiting');
+                if (test) {
+                  res = res.data
+                  if (res.code == 0 && res.data) {
+                    _this.formItems.forEach(p => {
+                      p.value = res.data[p.name]
+                    })
+                    _this.ts = res.data.ts
+                  }
+                  _this.waiting = false
+                  _this.dialogVisible2 = true
+                }
+              })
+          },
+          // 更新编辑数据
+          updateEditData() {
+            this.dialogWaiting = true
+            var _this = this
+            axios.post(this.urlUpdateEditData, {
+                id: this.ids[0],
+                storeName: this.currentFormItems.storeName,
+                storeNo: this.currentFormItems.storeNo,
+                storeLocation: this.currentFormItems.storeLocation,
+                description: this.currentFormItems.description,
+                ts: this.ts
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'dialogWaiting');
+                if (test) {
+                  _this.$message("上传成功")
+                  _this.dialogWaiting = false
+                  _this.dialogVisible2 = false
+                  _this.selected = []
+                  _this.getData()
+                }
+              })
+          },
+          // 删除仓库
+          delTab() {
+            this.waiting = true
+            var _this = this
+            axios.post(this.urlDel, {
+                id: this.ids
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'waiting');
+                if (test) {
+                  // setTimeout(() => {
+                  _this.waiting = false
+                  // }, 500)
+                  _this.$message("删除成功")
+                  _this.selected = []
+                  _this.getData()
+                }
+              })
+          },
+          // 按钮点击事件
+          buttonsevent: function(args) {
+            switch (args.currentTarget.textContent) {
+              case '新建':
+                {
+                  this.$refs.multipleTable.clearSelectionOuter()
+                  this.formItems.forEach(p => {
+                    p.value = ''
+                  })
+                  this.dialogVisible1 = true
+                  // console.log("新建操作");
+                  break
+                }
+              case '编辑':
+                {
+                  this.getEditData()
+                  console.log("编辑操作")
+                  break
+                }
+              case '删除':
+                {
+                  this.delTab()
+                  // console.log('删除操作');
+                  break
+                }
+              default:
+                console.log("！未知错误！")
+                break
+            }
+          },
+          // 表格多选操作
+          selection(arg) {
+            if (arg.length != 0) {
+              this.ids = []
+              this.selected = arg
+              this.selected.forEach(p => {
+                this.ids.push(p.id)
+              })
+            } else this.selected = []
+          },
+          // clearSelectionOuter() {},
+          // dialog关闭事件
+          dialogclose() {
+            this.$refs.multipleTable.clearSelectionOuter()
+          }
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>

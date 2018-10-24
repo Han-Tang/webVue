@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>新-产品资料</title>
+  <!-- 引入vue -->
+  <script src="../scripts/vue.js"></script>
+  <!-- 引入axios -->
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <!-- 引入element样式 -->
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- 引入element组件库 -->
+  <script src="../scripts/element-ui/index.js"></script>
+  <!-- 引入公共内容 -->
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../common.js"></script>
+  <script src="../scripts/components/button-group.js">
+  </script>
+  <script src="../scripts/components/cool-table.js">
+  </script>
+  <script src="../scripts/components/cool-query.js">
+  </script>
+  <script src="../scripts/components/cool-form.js">
+  </script>
+  <script src="../scripts/FileSaver.js-master/FileSaver.js"></script>
+
+  <style>
+    [v-cloak] {
+      display: none
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    .el-dialog--center .el-dialog__body{
+      padding: 0px
+    }
+
+    .rawdialog .el-dialog__body {
+      padding-top: 0px
+    }
+
+    .el-form--inline .el-form-item {
+      margin-right: 0px
+    }
+
+    .el-table th>.cell {
+      min-width: 95px
+    }
+
+    .el-table th {
+      padding: 5px 0
+    }
+  </style>
+</head>
+
+<body>
+  <div id="vm" v-cloak style="height:100%">
+    <el-container style="height:100%;border:1px solid #7A9973;">
+      <!-- 顶端按钮 -->
+      <el-header style="padding-left:0px" height="auto">
+        <button-group :buttons="buttons1" @button-click="buttonsevent1" :style="display1">
+        </button-group>
+        <button-group :buttons="buttons2" @button-click="buttonsevent2" :style="display2"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top:1px solid #7A9973;">
+          <!-- 侧边查询 -->
+          <!-- <el-aside width="220px" style="background:#fff;border-right:1px solid #7A9973;font-size:12px;">
+            <div style="height:28px;border-bottom:1px solid #7A9973;line-height:28px;text-align:center;background: #eff8ed;color: black;"> -->
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <cool-query :origin-condition="originCondition" @get-condition="getCondition">
+            </cool-query>
+          </el-aside>
+
+          <!-- <el-container style="height:100%;"> -->
+          <!-- 主表内容 -->
+          <!-- <el-main style="padding:0px 0px 0px 0px;height:100%"> -->
+          <cool-table ref="multipleTable" v-loading="tableLoading" :page="true" border="border" :data="productData" :columns="productColumns" :total="total" :layout="layout" :current-page.sync="condition.current" :page-size.sync="condition.offset"
+            :cell-style="cellRow" @pagination-size-change="paginationSizeChange" @pagination-current-change="paginationCurrentChange" @table-selection-change="handleSelectionChange"></cool-table>
+          <!-- </el-main> -->
+          <!-- </el-container> -->
+        </el-container>
+      </el-main>
+    </el-container>
+
+    <el-dialog title="文件导入" center :close-on-click-modal="false" :visible.sync="importDialog" width="400px" @close="closeDialog">
+      <span slot="footer" class="dialog-footer">
+        <el-upload class="upload-demo" ref="upload" :action="this.urlImport" :headers="headers" :data="uploadData" :limit="1" :on-exceed="handleExceed" :on-success="uploadSuccess" :auto-upload="false" accept=".xls,.xlsx">
+          <div slot="tip" class="el-upload__tip">请选择Excel文件进行上传</div>
+          <el-button slot="trigger" size="small" type="primary">选取文件</el-button>
+          <el-button style="margin-left: 10px;" size="small" type="success" @click="submitUpload">上传到服务器</el-button>
+          <el-button size="small" type="primary" @click="downloadTemplet">模板下载</el-button>
+        </el-upload>
+      </span>
+    </el-dialog>
+
+    <!-- 新建弹出框 -->
+    <el-dialog class="rawdialog" top='5vh' :visible.sync="dialogCreate" title="产品维护(新建)" width="1000px" style="font-size:20px;color:#E6A23C" :close-on-click-modal="false" v-loading="dialogLoading" element-loading-text="资料上传中"
+      element-loading-background="rgba(0, 0, 0, 0.8)" @close="closeDialog">
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button icon="el-icon-document" @click="createData" size="mini">保存</el-button>
+        <el-button icon="el-icon-back" @click="dialogCreate=false" size="mini">返回</el-button>
+      </el-button-group>
+      <!-- <product-create ref="productCreate" @newtabledata="newTableData" :create-row-data="createRowData" style="padding-top:20px;border:1px solid #7A9973"></product-create> -->
+      <cool-form :form-items="createform" :inline="true" label-width="100px" size="mini" style="border:1px solid #7A9973;border-bottom: none;padding-top:20px" @update-form="updateBasic">
+      </cool-form>
+      <el-tabs style="font-size:14px;border:1px solid #7A9973;border-top: none;" type="card">
+        <el-tab-pane label="销售">
+          <cool-form :form-items="saleform" :inline="true" label-width="100px" size="mini" style="padding-top:20px" @update-form="updateSale">
+          </cool-form>
+        </el-tab-pane>
+        <el-tab-pane label="采购">
+          <cool-form :form-items="purchform" :inline="true" label-width="100px" size="mini" style="padding-top:20px" @update-form="updatePurch">
+          </cool-form>
+        </el-tab-pane>
+        <el-tab-pane label="生产">
+          <cool-form :form-items="produceform" :inline="true" label-width="100px" size="mini" style="padding-top:20px" @update-form="updateProduce">
+          </cool-form>
+        </el-tab-pane>
+        <el-tab-pane label="附件">
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+
+    <!-- 编辑弹出框 -->
+    <el-dialog class="rawdialog" top='5vh' :visible.sync="dialogEdit" title="产品维护(编辑)" width="1000px" style="font-size:20px;color:#E6A23C" :close-on-click-modal="false" v-loading="dialogLoading" element-loading-text="资料上传中"
+      element-loading-background="rgba(0, 0, 0, 0.8)" @close="closeDialog">
+      <el-button-group style="border:1px solid #7A9973;border-bottom:none">
+        <el-button icon="el-icon-document" @click="editData" size="mini">保存</el-button>
+        <el-button icon="el-icon-back" @click="dialogEdit=false" size="mini">返回</el-button>
+      </el-button-group>
+      <cool-form :form-items="createform" :inline="true" label-width="100px" size="mini" style="border:1px solid #7A9973;border-bottom: none;padding-top:20px" @update-form="updateBasic">
+      </cool-form>
+      <el-tabs style="font-size:14px;border:1px solid #7A9973;border-top: none;" type="card">
+        <el-tab-pane label="销售">
+          <cool-form :form-items="saleform" :inline="true" label-width="100px" size="mini" style="padding-top:20px" @update-form="updateSale">
+          </cool-form>
+        </el-tab-pane>
+        <el-tab-pane label="采购">
+          <cool-form :form-items="purchform" :inline="true" label-width="100px" size="mini" style="padding-top:20px" @update-form="updatePurch">
+          </cool-form>
+        </el-tab-pane>
+        <el-tab-pane label="生产">
+          <cool-form :form-items="produceform" :inline="true" label-width="100px" size="mini" style="padding-top:20px" @update-form="updateProduce">
+          </cool-form>
+        </el-tab-pane>
+        <el-tab-pane label="附件">
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+  </div>
+
+  <script>
+    // var config = 'http://198.168.1.199:8081'
+    onload = function onload() {
+      window.vm = new Vue({
+        el: '#vm',
+        data: {
+          // url合集
+          urlQuery: config + '/infoProduct/queryList',
+          urlSave: config + '/infoProduct/save',
+          urlDelete: config + '/infoProduct/delete',
+          urlEdit: config + '/infoProduct/edit',
+          urlDetail: config + '/infoProduct/queryDetail',
+          urlExport: config + '/infoProduct/exportProduct', //导出
+          urlImport: config + '/infoProduct/importProduct', //导入
+          urlGetInfo: config + '/info/queryInfo',
+
+          // 导入
+          importDialog: false,
+          headers: {
+            token: localStorage.token,
+            Authorization: localStorage.token,
+            AccessControlAllowCredentials: true
+          },
+          uploadData: {
+            fileType: 'file',
+            filePurpose: 'fileInfoQuotation',
+            fkPurposeId: ''
+          },
+          // 查表数据及各项内容
+          // 表格样式
+          tableLoading: false,
+          cellRow: {
+            height: '30px',
+            padding: '5px 0'
+          },
+          //主表数据
+          productData: [],
+          // 表头内容
+          productColumns: [{
+              type: 'selection'
+            },
+            {
+              prop: 'index',
+              fixed: 'fixed',
+              width: '50px'
+            },
+            {
+              prop: 'name',
+              label: '产品名称',
+              fixed: 'fixed'
+            },
+            {
+              prop: 'code',
+              label: '产品编号'
+            },
+            {
+              prop: 'serial',
+              label: '系列名称'
+            },
+            {
+              prop: 'length',
+              label: '长'
+            },
+            {
+              prop: 'width',
+              label: '宽'
+            },
+            {
+              prop: 'thick',
+              label: '高'
+            },
+            {
+              prop: 'color1',
+              label: '产品主花色'
+            },
+            {
+              prop: 'meterial1',
+              label: '产品主材质'
+            },
+            {
+              prop: 'paint',
+              label: '漆类'
+            },
+            {
+              prop: 'unit',
+              label: '单位'
+            },
+            {
+              prop: 'unitprice',
+              label: '单价'
+            },
+            {
+              prop: 'sum',
+              label: '金额'
+            },
+            {
+              prop: 'stock',
+              label: '产品库存'
+            },
+            {
+              prop: 'occupancy',
+              label: '占用数量'
+            },
+            {
+              prop: 'left',
+              label: '剩余数量'
+            }
+          ],
+          total: 0,
+          layout: 'total, sizes, prev, pager, next, jumper',
+          condition: {
+            current: 1,
+            offset: 10
+          },
+          // 查询条件
+          originCondition: {
+            serial: {
+              value: '',
+              mode: '不参与',
+              name: '产品系列',
+              dataType: 'string',
+              fieldName: 'serial',
+              tableRelationMode: 'AND',
+              form: 'select',
+              options: []
+            },
+            code: {
+              value: '',
+              mode: '不参与',
+              name: '产品编号',
+              dataType: 'string',
+              fieldName: 'code',
+              tableRelationMode: 'AND',
+              form: 'input'
+            },
+            name: {
+              value: '',
+              mode: '不参与',
+              name: '产品名称',
+              dataType: 'string',
+              fieldName: 'name',
+              tableRelationMode: 'AND',
+              form: 'input'
+            },
+            color1: {
+              value: '',
+              mode: '不参与',
+              name: '产品花色',
+              dataType: 'string',
+              fieldName: 'color1',
+              tableRelationMode: 'AND',
+              form: 'select',
+              options: []
+            }
+          },
+          // 按钮组1
+          display1: '',
+          buttons1: [{
+              text: '查找',
+              size: 'mini',
+              icon: 'el-icon-search',
+              disabled: false
+            },
+            {
+              text: '新建',
+              size: 'mini',
+              icon: 'el-icon-plus',
+              disabled: false
+            },
+            {
+              text: '编辑',
+              size: 'mini',
+              icon: 'el-icon-edit',
+              disabled: false
+            },
+            {
+              text: '删除',
+              size: 'mini',
+              icon: 'el-icon-delete',
+              disabled: false
+            },
+            {
+              text: '导入',
+              size: 'mini',
+              icon: 'el-icon-upload2',
+              disabled: false
+            },
+            {
+              text: '导出',
+              size: 'mini',
+              icon: 'el-icon-download',
+              disabled: false
+            },
+          ],
+          // 按钮组2
+          display2: 'display:none',
+          buttons2: [{
+              text: '查找',
+              size: 'mini',
+              icon: 'el-icon-search',
+              disabled: false
+            },
+            {
+              text: '确认',
+              size: 'mini',
+              icon: 'el-icon-check',
+              disabled: false
+            },
+          ],
+          // 新建、编辑弹出框
+          dialogCreate: false,
+          dialogEdit: false,
+          dialogLoading: false,
+          createform: [{
+            type: 'input',
+            value: '',
+            label: '产品资料',
+            name: 'name',
+            style: {
+              width: '33.3%'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '系列名称',
+            name: 'serial',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '产品编号',
+            name: 'code',
+            style: {
+              width: '33.3%'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '产品花色',
+            name: 'color1',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '产品副花色',
+            name: 'color2',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '产品型号',
+            name: 'model',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '产品材质',
+            name: 'meterial1',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '产品副材质',
+            name: 'meterial2',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'radio',
+            value: false,
+            label: '是否外购',
+            name: 'buy',
+            radioItems: [{
+                value: true,
+                label: '是'
+              },
+              {
+                value: false,
+                label: '否'
+              }
+            ],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '长',
+            name: 'length',
+            style: {
+              width: '33.3%'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '宽',
+            name: 'width',
+            style: {
+              width: '33.3%'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '高',
+            name: 'thick',
+            style: {
+              width: '33.3%'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '漆类',
+            name: 'paint',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '造型',
+            name: 'shape',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '单位',
+            name: 'unit',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '软包类型',
+            name: 'softKind',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'select',
+            value: '',
+            label: '产品等级',
+            name: 'grade',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '备注',
+            name: 'description',
+            style: {
+              width: '100%'
+            }
+          }, ],
+          saleform: [{
+            type: 'select',
+            value: '',
+            label: '计价方式',
+            name: 'priceMethod',
+            options: [],
+            style: {
+              width: '33.3%'
+            },
+            inputStyle: {
+              width: '167px'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '默认销售价',
+            name: 'price',
+            style: {
+              width: '100%'
+            }
+          }],
+          purchform: [{
+            type: 'input',
+            value: '',
+            label: '采购价',
+            name: 'price',
+            style: {
+              width: '100%'
+            },
+          }, {
+            type: 'input',
+            value: '',
+            label: '供应商',
+            name: 'supplierCode',
+            style: {
+              width: '100%'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '包装贴纸',
+            name: 'logo',
+            style: {
+              width: '100%'
+            }
+          }],
+          produceform: [{
+            type: 'input',
+            value: '',
+            label: '生产周期',
+            name: 'cycle',
+            style: {
+              width: '100%'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '图纸号',
+            name: 'drawingNo',
+            style: {
+              width: '100%'
+            }
+          }, {
+            type: 'input',
+            value: '',
+            label: '备注',
+            name: 'description',
+            style: {
+              width: '100%'
+            }
+          }],
+          // 响应数据
+          currentFormData: {
+            basicForm: {},
+            saleForm: {},
+            purchForm: {},
+            produceForm: {}
+          },
+          // 当前选中行
+          currentConfirm: [],
+          currentSelection: [],
+          currentBasicEdit: {},
+          currentSaleEdit: {},
+          currentPurchEdit: {},
+          currentProduceEdit: {},
+        },
+        mounted() {
+          console.log(window.parent.root);
+          //初始化axios的头部信息，使之携带token，每个有请求的页面都必须初始化
+          initial()
+          setInterval(() => {
+            this.buttons1[2].disabled = this.currentSelection.length === 1 ? false : true
+            this.buttons1[3].disabled = this.currentSelection.length === 0 ? true : false
+            this.buttons1[5].disabled = this.productData.length == 0 ? true : false
+            this.buttons2[1].disabled = this.currentSelection.length === 0 ? true : false
+          }, 100)
+          var str = window.location.search
+          str = str.match('newPrice')
+          if (str != null) {
+            this.display1 = "display:none"
+            this.display2 = ""
+          }
+          // 获取查询条件选项
+          // 产品系列
+          axios.post(this.urlGetInfo, {
+            type: 'ProductNameType'
+          }).then(res => {
+            this.originCondition.serial.options = res.data.data
+            this.createform[1].options = res.data.data
+          })
+          // 产品花色
+          axios.post(this.urlGetInfo, {
+            type: 'ProductColorType'
+          }).then(res => {
+            this.originCondition.color1.options = res.data.data
+            this.createform[3].options = res.data.data
+          })
+          // 获取弹出框内选项
+          axios.post(this.urlGetInfo, {
+            type: 'ProductColor2Type'
+          }).then(res => {
+            this.createform[4].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'ProductModelType'
+          }).then(res => {
+            this.createform[5].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'ProductMaterialType'
+          }).then(res => {
+            this.createform[6].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'ProductMaterial2Type'
+          }).then(res => {
+            this.createform[7].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'PaintType'
+          }).then(res => {
+            this.createform[12].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'ModelMakeType'
+          }).then(res => {
+            this.createform[13].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'UnitType'
+          }).then(res => {
+            this.createform[14].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'SoftBagType'
+          }).then(res => {
+            this.createform[15].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'ProductGradeType'
+          }).then(res => {
+            this.createform[16].options = res.data.data
+          })
+          axios.post(this.urlGetInfo, {
+            type: 'PricingMethodType'
+          }).then(res => {
+            this.saleform[0].options = res.data.data
+          })
+        },
+        methods: {
+          getCondition: function(playload) {
+            for (var prop in this.condition) {
+              if (prop != 'current' && prop != 'offset') {
+                delete this.condition[prop]
+              }
+            }
+            this.condition = Object.assign(this.condition, playload)
+            console.log(this.condition);
+            this.condition.current = 1
+          },
+          // 主表查询
+          getData() {
+            this.tableLoading = true
+            axios.post(this.urlQuery, {
+              condition: this.condition
+            }).then(res => {
+              var test = checkCode(res.data.code, res.data.msg, this, 'tableLoading');
+              if (test) {
+                res = res.data
+                var jihe = []
+                jihe = res.data.records.map((p, index) => {
+                  var obj = {}
+                  obj = p.infoProduct
+                  if (p.productSale != null) {
+                    obj.unitprice = p.productSale.price
+                  }
+                  obj.index = p.index = (index + 1) + (this.condition.current - 1) * this.condition.offset
+                  return obj
+                })
+                this.productData = jihe
+                this.total = res.data.total
+                this.tableLoading = false
+              }
+            })
+          },
+          paginationSizeChange(arg) {
+            this.condition.current = 1
+            this.condition.offset = arg
+            this.getData()
+          },
+          paginationCurrentChange(arg) {
+            this.condition.current = arg
+            this.getData()
+          },
+          // 响应dialog数据
+          updateBasic(arg) {
+            this.currentFormData.basicForm = arg
+          },
+          updateSale(arg) {
+            this.currentFormData.saleForm = arg
+          },
+          updatePurch(arg) {
+            this.currentFormData.purchForm = arg
+          },
+          updateProduce(arg) {
+            this.currentFormData.produceForm = arg
+          },
+          // 新建保存
+          createData() {
+            this.dialogLoading = true
+            axios.post(this.urlSave, {
+                infoProduct: this.currentFormData.basicForm,
+                productProduce: this.currentFormData.produceForm,
+                productPurch: this.currentFormData.purchForm,
+                productSale: this.currentFormData.saleForm
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'dialogLoading');
+                if (test) {
+                  console.log(res);
+                  this.dialogCreate = false
+                  this.dialogLoading = false
+                  this.$message(res.data.msg)
+                  this.getData()
+                }
+              })
+          },
+          // 编辑数据
+          getEditInfo() {
+            this.tableLoading = true
+            axios.post(this.urlDetail, {
+              id: this.currentSelection[0]
+            }).then(res => {
+              var test = checkCode(res.data.code, res.data.msg, this, 'tableLoading');
+              if (test) {
+                res = res.data
+                this.currentBasicEdit = {}
+                this.currentSaleEdit = {}
+                this.currentPurchEdit = {}
+                this.currentProduceEdit = {}
+
+                this.currentBasicEdit.id = res.data.infoProduct.id
+                this.currentBasicEdit.ts = res.data.infoProduct.ts
+
+                this.currentSaleEdit.id = res.data.productSale.id
+                this.currentSaleEdit.ts = res.data.productSale.ts
+
+                this.currentPurchEdit.id = res.data.productPurch.id
+                this.currentPurchEdit.ts = res.data.productPurch.ts
+
+                this.currentProduceEdit.id = res.data.productProduce.id
+                this.currentProduceEdit.ts = res.data.productProduce.ts
+
+                this.createform.forEach(p => {
+                  p.value = res.data.infoProduct[p.name]
+                  this.currentFormData.basicForm[p.name] = res.data.infoProduct[p.name]
+                })
+                this.saleform.forEach(p => {
+                  p.value = res.data.productSale[p.name]
+                  this.currentFormData.saleForm[p.name] = res.data.productSale[p.name]
+                })
+                this.purchform.forEach(p => {
+                  p.value = res.data.productPurch[p.name]
+                  this.currentFormData.purchForm[p.name] = res.data.productPurch[p.name]
+                })
+                this.produceform.forEach(p => {
+                  p.value = res.data.productProduce[p.name]
+                  this.currentFormData.produceForm[p.name] = res.data.productProduce[p.name]
+                })
+                this.tableLoading = false
+                this.dialogEdit = true
+              }
+            })
+          },
+          editData() {
+            this.dialogLoading = true
+            this.currentFormData.basicForm = Object.assign(this.currentFormData.basicForm, this.currentBasicEdit)
+            this.currentFormData.saleForm = Object.assign(this.currentFormData.saleForm, this.currentSaleEdit)
+            this.currentFormData.purchForm = Object.assign(this.currentFormData.purchForm, this.currentPurchEdit)
+            this.currentFormData.produceForm = Object.assign(this.currentFormData.produceForm, this.currentProduceEdit)
+            axios.post(this.urlEdit, {
+                infoProduct: this.currentFormData.basicForm,
+                productSale: this.currentFormData.saleForm,
+                productPurch: this.currentFormData.purchForm,
+                productProduce: this.currentFormData.produceForm
+              })
+              .then(res => {
+                var test = checkCode(res.data.code, res.data.msg, this, 'dialogLoading');
+                if (test) {
+                  this.dialogEdit = false
+                  this.dialogLoading = false
+                  this.$message(res.data.msg)
+                  this.getData()
+                }
+              })
+          },
+          // 删除数据
+          delTab() {
+            this.tableLoading = true
+            axios.post(this.urlDelete, {
+              id: this.currentSelection
+            }).then(res => {
+              var test = checkCode(res.data.code, res.data.msg, this, 'tableLoading');
+              if (test) {
+                this.$message(res.data.msg)
+                this.getData()
+                this.tableLoading = false
+              }
+            })
+          },
+          // 勾选事件
+          handleSelectionChange(arg) {
+            // 当前ID
+            this.currentSelection = []
+            arg.forEach(p => {
+              this.currentSelection.push(p.id)
+            })
+            // 当前所有数据
+            this.currentConfirm = []
+            this.currentConfirm = arg
+          },
+          // 导入
+          downloadTemplet() {
+            axios.post(this.urlExport, {
+                condition: this.condition,
+                template: true
+              }, {
+                responseType: 'blob'
+              })
+              .then(res => {
+                // console.log(res);
+                let fileHeader = ''
+                for (i in res.headers) {
+                  if (i == 'content-disposition') {
+                    fileHeader = decodeURIComponent(res.headers[i])
+                  }
+                }
+                saveAs(res.data, fileHeader)
+              })
+          },
+          submitUpload() {
+            this.$refs.upload.submit();
+          },
+          // 上传个数限制
+          handleExceed(files, fileList) {
+            this.$message.warning(`当前限制选择 1 个文件，本次已选择了 ${files.length} 个文件，如有更多文件请分批上传`);
+            // 共选择了 ${files.length + fileList.length} 个文件
+          },
+          uploadSuccess(response, file, fileList) {
+            console.log(response);
+            this.$refs.upload.clearFiles();
+            if (response.code != 0) {
+              return this.$message(response.msg)
+            }
+          },
+          //导出
+          downloadAttachment() {
+            this.condition.offset = 100000;
+            axios.post(this.urlExport, {
+                condition: this.condition
+              }, {
+                responseType: 'blob'
+              })
+              .then(res => {
+                // if (!res.data) {
+                //   return
+                // }
+                // let fileHeader = ''
+                // for (i in res.headers) {
+                //   if (i == 'content-disposition') {
+                //     fileHeader = res.headers[i]
+                //   }
+                // }
+                // let url = window.URL.createObjectURL(new Blob([res.data]))
+                // let link = document.createElement('a')
+                // link.style.display = 'none'
+                // link.href = url
+                // link.setAttribute('download', fileHeader)
+                //
+                // document.body.appendChild(link)
+                // link.click()
+
+                // console.log(res);
+                let fileHeader = ''
+                for (i in res.headers) {
+                  if (i == 'content-disposition') {
+                    fileHeader = decodeURIComponent(res.headers[i])
+                  }
+                }
+                saveAs(res.data, fileHeader)
+              })
+          },
+
+          // 弹窗关闭事件
+          closeDialog() {
+            this.createform.forEach(p => {
+              p.value = ''
+            })
+            this.saleform.forEach(p => {
+              p.value = ''
+            })
+            this.purchform.forEach(p => {
+              p.value = ''
+            })
+            this.produceform.forEach(p => {
+              p.value = ''
+            })
+            this.$refs.multipleTable.clearSelectionOuter()
+          },
+          // 按钮组1
+          buttonsevent1(args) {
+            switch (args.currentTarget.textContent) {
+              case '查找':
+                {
+                  this.getData()
+                  break
+                }
+              case '新建':
+                {
+                  this.$refs.multipleTable.clearSelectionOuter()
+                  this.dialogCreate = true
+                  break
+                }
+              case '编辑':
+                {
+                  this.getEditInfo()
+                  break
+                }
+              case '删除':
+                {
+                  this.delTab()
+                  break
+                }
+              case '导入':
+                {
+                  this.importDialog = true
+                  break
+                }
+              case '导出':
+                {
+                  this.downloadAttachment()
+                  break
+                }
+              default:
+                break
+            }
+          },
+          confirmData() {
+            var abc = {}
+            abc = this.currentConfirm.filter(a => !window.parent.root.dialogData.map(d => d.productCode)
+              .includes(a.code)).map(a => ({
+              productName: a.name,
+              productCode: a.code,
+              spec: a.spec,
+              mainColor: a.color1,
+              viceColor: a.color2,
+              mainMaterial: a.meterial1,
+              viceMaterial: a.meterial2,
+              price: a.unitprice,
+            }))
+            abc.forEach(p => {
+              window.parent.root.dialogData.push(p)
+            })
+            window.parent.root.newEditVisible = false
+          },
+          // 按钮组2
+          buttonsevent2(args) {
+            switch (args.currentTarget.textContent) {
+              case '查找':
+                {
+                  this.getData()
+                  break
+                }
+              case '确认':
+                {
+                  this.confirmData()
+                  break
+                }
+              default:
+                break
+            }
+          }
+        }
+      })
+    }
+  </script>
+</body>
+
+</html>

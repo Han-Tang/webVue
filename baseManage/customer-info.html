@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta charset="utf-8" />
+  <meta http-equiv="pragma" content="no-cache">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <title>讯航ERP管理系统</title>
+  <link rel="stylesheet" href="../scripts/element-ui/theme-cool/index.css">
+  <!-- <link rel="stylesheet" href="../css/index.css"> -->
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="../scripts/vue.js"></script>
+  <script src="../scripts/element-ui/index.js"></script>
+  <script src="../scripts/axios/dist/axios.js"></script>
+  <script src="../scripts/components/button-group.js">
+  </script>
+  <script src="../scripts/components/cool-query.js"></script>
+  <script src="../scripts/components/cool-table.js"></script>
+  <script src="../scripts/components/cool-form.js"></script>
+  <script src="../menu.js"></script>
+  <!-- <script src="index.js"></script> -->
+  <script src="../common.js"></script>
+</head>
+
+<body>
+  <div id="root">
+    <el-container style="height:100%;margin:0;position: absolute;width: 100%;border:1px solid #7A9973;">
+      <el-header height="auto">
+        <button-group :buttons="buttons" @button-click="buttonsevent"></button-group>
+      </el-header>
+      <el-main style="height:100%">
+        <el-container style="height:100%;border-top:1px solid #7A9973;">
+          <el-aside width="220px" class="sidequery">
+            <div class="sidetitle">
+              查询条件
+            </div>
+            <!-- 侧边栏查询控件 -->
+            <cool-query :origin-condition="orginCondition" @get-condition="getCondition"></cool-query>
+          </el-aside>
+          <el-container style="height:100%">
+            <el-main style="height:100%">
+              <!-- 客户信息主表 -->
+              <cool-table button-group-class="el-header" stripe="stripe" @table-row-click="handleRowClick" :cell-style="cellRow" :page="true" border="border" highlight-current-row="highlight-current-row" :columns="Hdrcolumns" :total="total"
+                :current-page.sync="condition.current" :data="HdrData" :page-size.sync="condition.offset" @pagination-size-change="handleSizeChange" @pagination-current-change="handlePageChange" :layout="layout" v-loading="tableLoading">
+              </cool-table>
+            </el-main>
+            <el-footer height="260px" ref="footer" style="border-top:1px solid #7A9973;">
+              <el-tabs type="border-card">
+                <el-tab-pane label="客户联系方式">
+                  <!-- 客户联系方式表格 -->
+                  <cool-table :columns="Dtlcolumns" highlight-current-row="highlight-current-row" ref="contactTable" height="195px" @table-row-click="handleDtlClick" :data="DtlData" :buttons="dtlButtons" @button-click="dtlButtonsevent" :button="true"
+                    :cell-style="cellRow" border="border" stripe="stripe"></cool-table>
+                </el-tab-pane>
+
+                <el-tab-pane label="附件">
+                  <cool-table ref="multipleTable" :upload-tool="true" :size="size" :url-upload-attachment="urlUploadAttachment" :headers="headers" :upload-data="uploadData" @uploadsuccess="uploadSuccess" :upbtn1="upbtn1" :upbtn2="upbtn2" :upbtn3="upbtn3"
+                    :upbtn4="upbtn4" @deluploaded="delUploaded" @downloadattachment="downloadAttachment" :columns="fileList" :data="updatedData" :cell-style="cellRow" table-style="border-bottom: solid #DCDFE6 1px;overflow:auto" border="border"
+                    height="192px" @table-selection-change="uploadedSelect"></cool-table>
+                </el-tab-pane>
+
+              </el-tabs>
+            </el-footer>
+          </el-container>
+        </el-container>
+      </el-main>
+      <!-- 新建客户弹窗，内嵌cool-form表单控件 -->
+      <el-dialog title="新建客户" :visible.sync="dialogVisible" width="800px" center>
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogVisible=false" size="mini">取 消</el-button>
+          <el-button @click="saveCustomerClick" size="mini">保 存</el-button>
+        </el-button-group>
+        <cool-form style="border:1px solid #7A9973;padding-top:20px" :form-items="formItems" size="mini" :inline="true" label-width="120px" @update-form='getCustomer' @querysearch="querySearch" @select="handleSelect"></cool-form>
+      </el-dialog>
+      <!-- 新建客户联系方式弹窗，考虑是否需要用coool-form控件 -->
+      <el-dialog title="新建客户联系" :visible.sync="dialogContractVisible" width="800px" center>
+        <el-button-group style="border:1px solid #7A9973">
+          <el-button @click="dialogContractVisible=false" size="mini">取 消</el-button>
+          <el-button @click="saveContactClick" size="mini">保 存</el-button>
+        </el-button-group>
+        <cool-form :form-items="dtlformItems" @update-form="getcustomerContact" :inline="true" label-width="120px" size="mini" style="border:1px solid #7A9973;padding-top:20px"></cool-form>
+      </el-dialog>
+    </el-container>
+  </div>
+</body>
+<script>
+  var root = new Vue({
+    el: '#root',
+    data: {
+      //url合集
+      urlQuery: config + '/customer/queryByPage',
+      urlSave: config + '/customer/save',
+      urlUpdateFile: config + '/system/sysCompany/update',
+      urlGetTypes: config + '/info/queryInfo',
+      urlContactQuery: config + '/customer/dtlContact',
+      urlDelete: config + '/customer/delete',
+      urlDeleteContact: config + '/customer/deleteContact',
+      urlSaveContact: config + '/customer/saveContact',
+      urlGetInfo: config + '/info/queryInfo',
+      urlGetUsers: config + '/user/users',
+      urlUploadAttachment: config + '/file/uploadFile',
+      urlGetUploadedData: config + '/file/list',
+      urlDelUploaded: config + '/file/delete',
+      urlDownload: config + '/file/downloadFile',
+      // 上传附件
+      headers: {
+        token: localStorage.token,
+        Authorization: localStorage.token,
+        AccessControlAllowCredentials: true
+      },
+      uploadData: {
+        fileType: 'file',
+        filePurpose: 'fileInfoCustomer',
+        fkPurposeId: ''
+      },
+      uploadeddisabled: true,
+      deldisabled: true,
+      selectUpdate: true,
+      downloadButton: true,
+      updatedData: [],
+      currentId: [],
+      upbtn1: true,
+      upbtn2: true,
+      upbtn3: true,
+      upbtn4: true,
+
+      //侧边栏查询prop
+      condition: {
+        offset: 10,
+        current: 1
+      },
+      orginCondition: {
+        name: {
+          value: '',
+          name: '客户名称',
+          fieldName: 'name',
+          form: 'input'
+        },
+        code: {
+          value: '',
+          name: '客户编号',
+          fieldName: 'code',
+          form: 'input'
+        },
+        type: {
+          value: '',
+          name: '客户类别',
+          fieldName: 'type',
+          form: 'select',
+          options: [{
+            value: 'A',
+            label: 'A'
+          }, {
+            value: 'B',
+            label: 'B'
+          }]
+        }
+      },
+      //客户主表数据
+      HdrData: [],
+      Hdrcolumns: [{
+          prop: 'index',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'name',
+          label: '客户名称',
+          fixed: 'fixed',
+          width: '90px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'code',
+          label: '客户编码',
+          width: '110px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'type',
+          label: '客户类别',
+          width: '90px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'manager',
+          label: '法人',
+          width: '90px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'region',
+          label: '区域',
+          width: '130px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'fax',
+          label: '传真号码',
+          width: '130px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'category',
+          label: '分类',
+          width: '100px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'address',
+          label: '联系地址',
+          width: '130px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'shippingAddress',
+          label: '收货地址',
+          width: '130px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'email',
+          label: '邮箱地址',
+          width: '120px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'salesman',
+          label: '业务员',
+          width: '100px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'idNumber',
+          label: '证件号码',
+          width: '130px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'payment',
+          label: '默认支付方式',
+          width: '100px',
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'remark',
+          label: '备注',
+          width: '130px',
+          showOverflowTooltip: true
+        }
+      ],
+      currentRow: undefined,
+      total: 0,
+      layout: 'total, sizes, prev, pager, next, jumper',
+      tableLoading: false,
+      buttons: [{
+          text: '查找',
+          size: 'mini',
+          icon: 'el-icon-search',
+          disabled: false
+        },
+        {
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          disabled: false
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          disabled: false
+        },
+        {
+          text: '确认',
+          size: 'mini',
+          icon: 'el-icon-check',
+          disabled: false
+        },
+        // {
+        //   text: '取消',
+        //   size: 'mini',
+        //   icon: 'el-icon-close',
+        //   disabled: false
+        // }
+      ],
+      //联系方式明细表数据
+      DtlData: [],
+      dtlCurrentRow: undefined,
+      Dtlcolumns: [{
+          type: 'index',
+          fixed: 'fixed'
+        },
+        {
+          prop: 'customerCode',
+          label: '客户编码'
+        },
+        {
+          prop: 'contact',
+          label: '联系人'
+        },
+        {
+          prop: 'phone',
+          label: '联系电话1'
+        },
+        {
+          prop: 'phone2',
+          label: '联系电话2'
+        },
+        {
+          prop: 'phone3',
+          label: '联系电话3'
+        },
+        {
+          prop: 'weChat',
+          label: '微信号'
+        },
+        {
+          prop: 'qq',
+          label: 'QQ'
+        },
+        {
+          prop: 'address',
+          label: '联系地址'
+        },
+        {
+          prop: 'email',
+          label: '邮箱地址'
+        },
+        {
+          prop: 'position',
+          label: '职务'
+        }
+      ],
+      dtlButtons: [{
+          text: '新建',
+          size: 'mini',
+          icon: 'el-icon-plus',
+          disabled: false
+        },
+        {
+          text: '编辑',
+          size: 'mini',
+          icon: 'el-icon-edit',
+          disabled: false
+        },
+        {
+          text: '删除',
+          size: 'mini',
+          icon: 'el-icon-delete',
+          disabled: false
+        },
+        // {
+        //   text: '取消',
+        //   size: 'mini',
+        //   icon: 'el-icon-close',
+        //   disabled: false
+        // }
+      ],
+      //新增客户cool-form表单数据
+      formItems: [{
+          label: '客户名称',
+          value: '',
+          name: 'name',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '客户类型',
+          value: '',
+          name: 'type',
+          type: 'select',
+          options: [],
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '客户编码',
+          value: '',
+          name: 'code',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '法人',
+          value: '',
+          name: 'manager',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '联系电话',
+          value: '',
+          name: 'phone',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '传真号码',
+          value: '',
+          name: 'fax',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '分类',
+          value: '',
+          name: 'category',
+          type: 'select',
+          options: [],
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '邮箱地址',
+          value: '',
+          name: 'email',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '业务员',
+          value: '',
+          name: 'salesman',
+          type: 'autocomplete',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '证件号码',
+          value: '',
+          name: 'idNumber',
+          type: 'input',
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '支付方式',
+          value: '',
+          name: 'payment',
+          type: 'select',
+          options: [],
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '提货方式',
+          value: '',
+          name: 'delivery',
+          type: 'select',
+          options: [],
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '区域',
+          value: '',
+          name: 'region',
+          type: 'select',
+          options: [],
+          style: {
+            width: '50%'
+          }
+        },
+        {
+          label: '联系地址',
+          value: '',
+          name: 'address',
+          type: 'input',
+          style: {
+            width: '100%'
+          },
+          inputStyle: {
+            width: '400px'
+          }
+        },
+        {
+          label: '收货地址',
+          value: '',
+          name: 'shippingAddress',
+          type: 'input',
+          style: {
+            width: '100%'
+          },
+          inputStyle: {
+            width: '400px'
+          }
+        },
+        {
+          label: '备注',
+          value: '',
+          name: 'remark',
+          type: 'input',
+          style: {
+            width: '100%'
+          },
+          inputStyle: {
+            width: '400px'
+          }
+        }
+      ],
+      //新建过编辑主表后数据的容器，保存请求的时候做为参数
+      customer: {},
+      dialogVisible: false,
+      //明细表cool-form控件props
+      dtlformItems: [{
+          type: 'input',
+          value: '',
+          label: '客户编码',
+          name: 'customerCode',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '联系人',
+          name: 'contact',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '联系电话1',
+          name: 'phone',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '联系电话2',
+          name: 'phone2',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '联系电话3',
+          name: 'phone3',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '微信号',
+          name: 'weChat',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: 'QQ',
+          name: 'qq',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '职务',
+          name: 'position',
+          style: 'width:50%'
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '联系地址',
+          name: 'address',
+          style: 'width:100%',
+          inputStyle: {
+            width: '400px'
+          }
+        },
+        {
+          type: 'input',
+          value: '',
+          label: '邮箱地址',
+          name: 'email',
+          style: 'width:100%',
+          inputStyle: {
+            width: '400px'
+          }
+        },
+      ],
+      dialogContractVisible: false,
+      //新建编辑主表后数据的容器，保存请求的时候做为参数
+      customerContact: [],
+      //表格cell样式和客户查询初始参数
+      cellRow: {
+        padding: '4px 0',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      },
+      //upload数据
+      size: 'mini',
+      uploadlist: [],
+      fileList: [{
+          type: 'selection',
+          selectable: true
+        }, {
+          prop: 'name',
+          label: '附件名称'
+        },
+        {
+          prop: 'updateDate',
+          label: '上传日期'
+        },
+        {
+          prop: 'createName',
+          label: '操作人'
+        }
+      ],
+      userName: []
+    },
+    mounted() {
+      //销售部分都有详细注释
+      initial()
+      this.$el.style.visibility = 'visible'
+      //获取formitem和orginCondition的select部分options数据，这里相当formitems相当于是按索引写死了，修改不方便，要注意，要是有其他数据格式更方便建议更换
+      axios.post(this.urlGetTypes, {
+        type: 'CustomerType'
+      }).then(resp => {
+        this.formItems[1].options = resp.data.data
+        this.orginCondition.type.options = resp.data.data
+      })
+      axios.post(this.urlGetTypes, {
+        type: 'CustomerClass'
+      }).then(resp => {
+        this.formItems[6].options = resp.data.data
+      })
+
+      axios.post(this.urlGetUsers, {
+        current: 1,
+        offset: 1000
+      }).then(res => {
+        res = res.data
+        if (res.code == 0 && res.data) {
+          this.userName = res.data
+          console.log(this.userName);
+        } else {
+          this.$message('获取业务员出错')
+        }
+      })
+
+      axios.post(this.urlGetInfo, {
+        type: 'PayType'
+      }).then((resp) => {
+        this.formItems[10].options = resp.data.data
+      })
+      axios.post(this.urlGetInfo, {
+        type: 'DeliveryType'
+      }).then((resp) => {
+        this.formItems[11].options = resp.data.data
+      })
+      axios.post(this.urlGetInfo, {
+        type: 'REGION'
+      }).then((resp) => {
+        this.formItems[12].options = resp.data.data
+      })
+
+      setInterval(() => {
+        this.buttons[2].disabled = this.currentRow === undefined ? true : false
+        this.buttons[3].disabled = this.currentRow === undefined ? true : false
+        //只有当主表有选中数据之后，联系表的新建才可用，因为需要主表的客户编码信息
+        this.dtlButtons[0].disabled = this.currentRow === undefined ? true : false
+        this.dtlButtons[1].disabled = this.dtlCurrentRow === undefined ? true : false
+        this.dtlButtons[2].disabled = this.dtlCurrentRow === undefined ? true : false
+        this.upbtn1 = this.currentRow === undefined ? true : false
+        this.upbtn2 = this.$refs.multipleTable.uploadlist.length === 0 ? true : false
+        this.upbtn3 = this.currentId.length === 0 ? true : false
+        this.upbtn4 = this.currentId.length === 1 ? false : true
+      }, 100)
+    },
+    methods: {
+      //autocomplete控件事件
+      querySearch(queryString, cb) {
+        this.userName.forEach(p => (p.value = p.name))
+        var results = queryString ?
+          this.userName.filter(this.createFilter(queryString)) :
+          this.userName
+        cb(results)
+      },
+      createFilter(queryString) {
+        return name => {
+          return (
+            name.value.toLowerCase().indexOf(queryString.toLowerCase()) !== -1
+          )
+        }
+      },
+      handleSelect(item) {
+        this.formItems[8].value = item.name
+      },
+      //获取传出的查询参数
+      getCondition: function(playload) {
+        for (var prop in this.condition) {
+          if (prop != 'current' && prop != 'offset') {
+            delete this.condition[prop]
+          }
+        }
+        this.condition = Object.assign(this.condition, playload)
+        this.condition.current = 1
+      },
+      //获取cool-form控件传出的参数用于保存新建客户/客户联系方式
+      getCustomer(arg) {
+        this.customer = arg
+      },
+      getcustomerContact(arg) {
+        this.customerContact = arg
+      },
+      //查询客户信息主表
+      getHdrData: function() {
+        this.tableLoading = true
+        axios
+          .post(this.urlQuery, this.condition).then(resp => {
+            var test = checkCode(resp.data.code, resp.data.msg, this, 'tableLoading');
+            if (test) {
+              this.tableLoading = false;
+              this.HdrData = formatIndex(resp.data.data.records, this.condition.current, this.condition.offset);
+              this.total = resp.data.data.total;
+              this.DtlData = [];
+              this.currentRow = undefined;
+            }
+          }).catch((error) => {
+            this.tableLoading = false
+            this.$message.error('请求异常，请联系管理员')
+          })
+      },
+      //删除主表行记录
+      delTab: function(url, param) {
+        if (confirm('确定要删除选定的记录')) {
+          var loading = setLoading(this)
+          axios.post(url, param).then(resp => {
+            var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+            if (test) {
+              setTimeout(() => {
+                this.$message(resp.data.msg);
+                loading.close()
+              }, 500)
+              this.getHdrData()
+            }
+          }).catch((error) => {
+            setTimeout(() => {
+              this.$message.error('请求异常，请联系管理员');
+              loading.close()
+            }, 500)
+          })
+        }
+      },
+      handleDtlClick(arg) {
+        this.dtlCurrentRow = arg
+      },
+      //新建客户保存按钮
+      saveCustomerClick() {
+        //新建的时候给currentRow为undefined就是为了在这里用的
+        if (this.currentRow != undefined) {
+          this.customer.id = this.currentRow.id
+          this.customer.ts = this.currentRow.ts
+        }
+        var loading = setLoading(this);
+        axios.post(this.urlSave, this.customer).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500);
+            this.dialogVisible = false;
+            this.getHdrData();
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+      },
+      //新建联系方式保存
+      saveContactClick() {
+        if (this.dtlCurrentRow != undefined) {
+          this.customerContact.id = this.dtlCurrentRow.id
+          this.customerContact.ts = this.dtlCurrentRow.ts
+        }
+        var loading = setLoading(this)
+        axios.post(this.urlSaveContact, this.customerContact).then(resp => {
+          var test = checkCode(resp.data.code, resp.data.msg, this, loading);
+          if (test) {
+            setTimeout(() => {
+              this.$message(resp.data.msg);
+              loading.close()
+            }, 500)
+            this.dialogContractVisible = false
+            axios.post(this.urlContactQuery, {
+              code: this.currentRow.code
+            }).then(resp => {
+              var test1 = checkCode(resp.data.code, resp.data.msg, this, loading);
+              if (test1) {
+                this.DtlData = resp.data.data
+                this.$refs.contactTable.setCurrentRow(this.dtlCurrentRow)
+              }
+
+            })
+          }
+        }).catch((error) => {
+          setTimeout(() => {
+            this.$message.error('请求异常，请联系管理员');
+            loading.close()
+          }, 500)
+        })
+      },
+      //主表按钮点击事件
+      buttonsevent: function(args) {
+        switch (args.currentTarget.textContent) {
+          case '查找':
+            {
+              this.getHdrData()
+              break
+            }
+          case '新建':
+            {
+              this.currentRow = undefined
+              this.formItems.forEach(p => {
+                p.value = ''
+              })
+              this.urlSave = config + '/customer/save'
+              this.dialogVisible = true
+              break
+            }
+          case '编辑':
+            {
+              this.urlSave = config + '/customer/update'
+              this.formItems.forEach(p => {
+                p.value = this.currentRow[p.name]
+              })
+              this.dialogVisible = true
+              break
+            }
+          case '删除':
+            {
+              if (confirm('确定要删除选定的记录')) {
+                this.delTab(this.urlDelete, {
+                  code: this.currentRow.code
+                })
+                this.getHdrData()
+              }
+              break
+            }
+          default:
+            break
+        }
+      },
+      //明细表按钮点击事件
+      dtlButtonsevent(args) {
+        switch (args.currentTarget.textContent) {
+          case '新建':
+            {
+              this.dtlCurrentRow = undefined
+              this.dtlformItems.forEach(p => {
+                if (p.name != 'customerCode') {
+                  p.value = ''
+                }
+              })
+              this.urlSaveContact = config + '/customer/saveContact'
+              this.dialogContractVisible = true
+              break
+            }
+          case '编辑':
+            {
+              this.urlSaveContact = config + '/customer/updateContact'
+              this.dtlformItems.forEach(p => {
+                p.value = this.dtlCurrentRow[p.name]
+              })
+              this.dialogContractVisible = true
+            }
+            break
+          case '删除':
+            {
+              this.delTab(this.urlDeleteContact, {
+                id: this.dtlCurrentRow.id,
+                ts: this.dtlCurrentRow.ts
+              })
+              axios.post(this.urlContactQuery, {
+                code: this.currentRow.code
+              })
+              .then(resp => {
+                this.DtlData = resp.data.data
+              })
+            }
+        }
+      },
+      handlePageChange(page) {
+        this.condition.current = page
+        this.getHdrData()
+      },
+      handleSizeChange(arg) {
+        this.condition.current = 1
+        this.condition.offset = arg
+        this.getHdrData()
+      },
+      //主表行点击事件
+      handleRowClick(arg) {
+        this.dtlCurrentRow = undefined
+        this.currentRow = arg
+        //给联系表的客户编码默认值
+        this.dtlformItems[0].value = arg.code
+        axios
+          .post(this.urlContactQuery, {
+            code: this.currentRow.code
+          })
+          .then(resp => {
+            this.DtlData = resp.data.data
+          })
+        this.uploadData.fkPurposeId = arg.code
+        this.getUploadedData(arg)
+      },
+      //上传附件
+      uploadSuccess(response, file, fileList) {
+        this.uploadlist = fileList
+        this.getUploadedData()
+        this.uploadlist.splice(this.uploadlist.indexOf(file), 1)
+      },
+      // 获取附件列表
+      getUploadedData() {
+        // console.log(ev.formno);
+        axios.post(this.urlGetUploadedData, {
+            code: this.currentRow.code,
+            purpose: "fileInfoCustomer"
+          })
+          .then(res => {
+            res = res.data
+            if (res.code == 0 && res.data) {
+              this.updatedData = res.data
+            }
+          })
+      },
+      uploadChange(arg) {
+        console.log('1');
+      },
+      // 勾选事件
+      uploadedSelect(arg) {
+        this.currentId = []
+        if (arg.length != 0) {
+          this.currentAttachInfo = arg[0].name
+        }
+        arg.forEach(p => {
+          this.currentId.push(p.id)
+        })
+      },
+      delUploaded() {
+        var _this = this
+        axios.post(this.urlDelUploaded, {
+            ids: this.currentId
+          })
+          .then(res => {
+            var test = checkCode(res.data.code, res.data.msg, this);
+            if (test) {
+              res = res.data
+              _this.$message('删除附件成功!')
+              _this.currentId = []
+              _this.getUploadedData()
+            }
+          })
+      },
+      downloadAttachment() {
+        axios.post(this.urlDownload, {
+            id: this.currentId[0],
+          }, {
+            responseType: 'blob'
+          })
+          .then(res => {
+            this.download(res.data)
+          })
+      },
+      download(data) {
+        if (!data) {
+          return
+        }
+        let url = window.URL.createObjectURL(new Blob([data]))
+        let link = document.createElement('a')
+        link.style.display = 'none'
+        link.href = url
+        link.setAttribute('download', this.currentAttachInfo)
+
+        document.body.appendChild(link)
+        link.click()
+        this.$refs.multipleTable.clearSelectionOuter();
+      }
+    }
+  })
+</script>
